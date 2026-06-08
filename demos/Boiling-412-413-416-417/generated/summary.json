@@ -1,0 +1,62 @@
+[
+  {
+    "test_id": "Boiling-412",
+    "applied_power_W": 150.0,
+    "status": "Failure: CHF not reached",
+    "surface": "Flat Cu",
+    "pressure_mean_kPa": 97.28,
+    "pressure_std_kPa": 0.05855375979270202,
+    "T_sat_C": 98.83684632222776,
+    "mean_liquid_temp_C": 58.829168300553505,
+    "mean_vapour_temp_C": 55.76587363505536,
+    "max_heat_flux_W_cm2": 142.0218777952753,
+    "time_at_max_heat_flux_s": 462.8,
+    "max_surface_temp_C": 112.73542023600007,
+    "time_at_max_surface_temp_s": 538.8
+  },
+  {
+    "test_id": "Boiling-413",
+    "applied_power_W": 180.0,
+    "status": "Failure: CHF not reached",
+    "surface": "Flat Cu",
+    "pressure_mean_kPa": 97.3,
+    "pressure_std_kPa": 0.058576268889117655,
+    "T_sat_C": 98.84256591905148,
+    "mean_liquid_temp_C": 52.384150331525426,
+    "mean_vapour_temp_C": 47.83999019084746,
+    "max_heat_flux_W_cm2": 163.11568639370063,
+    "time_at_max_heat_flux_s": 393.6,
+    "max_surface_temp_C": 159.59306365299997,
+    "time_at_max_surface_temp_s": 574.8
+  },
+  {
+    "test_id": "Boiling-416",
+    "applied_power_W": 230.0,
+    "status": "Failure: CHF not reached",
+    "surface": "Flat Cu",
+    "pressure_mean_kPa": 97.47,
+    "pressure_std_kPa": 0.05817318439609931,
+    "T_sat_C": 98.89114320272597,
+    "mean_liquid_temp_C": 57.26520791076426,
+    "mean_vapour_temp_C": 50.88240678622174,
+    "max_heat_flux_W_cm2": 267.23561508661413,
+    "time_at_max_heat_flux_s": 754.0,
+    "max_surface_temp_C": 166.968477178,
+    "time_at_max_surface_temp_s": 749.6
+  },
+  {
+    "test_id": "Boiling-417",
+    "applied_power_W": 250.0,
+    "status": "Failure: CHF not reached",
+    "surface": "Flat Cu",
+    "pressure_mean_kPa": 97.51,
+    "pressure_std_kPa": 0.058213468957147796,
+    "T_sat_C": 98.90256294901906,
+    "mean_liquid_temp_C": 57.60048842093023,
+    "mean_vapour_temp_C": 49.92851421476239,
+    "max_heat_flux_W_cm2": 277.95529029921306,
+    "time_at_max_heat_flux_s": 608.4,
+    "max_surface_temp_C": 172.869782979,
+    "time_at_max_surface_temp_s": 132.4
+  }
+]

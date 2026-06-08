@@ -66,6 +66,26 @@ The default command analyzes `Boiling-417` from
 `Y:\0_Ishraq\New Pool Boiling Video\Boiling-417` and writes generated summary
 files and lightweight plots to `demos\Boiling-417\generated`.
 
+## Compare Multiple Cases
+
+To compare boiling curves for the default heat-load sweep
+(`Boiling-412`, `Boiling-413`, `Boiling-416`, and `Boiling-417`), run:
+
+```powershell
+python scripts\run_multi_case_comparison.py
+```
+
+The script reads the raw folders under
+`Y:\0_Ishraq\New Pool Boiling Video`, looks up metadata in
+`metadata\Pool Boiling Test Log.xlsx`, and writes combined plots plus CSV/JSON
+summaries to `demos\Boiling-412-413-416-417\generated`.
+
+To compare a different set of cases:
+
+```powershell
+python scripts\run_multi_case_comparison.py --test-ids Boiling-145 Boiling-146 Boiling-147
+```
+
 ## Notes for Contributors
 
 - Keep raw videos and large acquisition outputs outside git.
