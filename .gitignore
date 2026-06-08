@@ -1,0 +1,18 @@
+# Python/Jupyter local artifacts
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+
+# Local environments
+.env
+.venv/
+venv/
+
+# Large raw experimental data should remain on the lab/network drive.
+raw/
+data/raw/
+New Pool Boiling Video/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

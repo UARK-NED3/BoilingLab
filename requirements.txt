@@ -1,0 +1,11 @@
+numpy
+pandas
+matplotlib
+scipy
+openpyxl
+pyXSteam
+jupyter
+ipykernel
+nbformat
+nbclient
+imageio-ffmpeg
