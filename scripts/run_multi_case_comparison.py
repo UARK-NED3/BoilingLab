@@ -176,10 +176,9 @@ def plot_comparison(
     x_key: str,
     x_label: str,
     output_path: Path,
-    title: str,
     downsample: int,
 ) -> None:
-    fig, ax = plt.subplots(figsize=(11, 7))
+    fig, ax = plt.subplots(figsize=(9, 8))
     for case in cases:
         x = np.asarray(case[x_key], dtype=float)
         y = np.asarray(case["heat_flux_W_cm2"], dtype=float)
@@ -187,9 +186,8 @@ def plot_comparison(
         step = max(1, downsample)
         ax.plot(x[finite][::step], y[finite][::step], linewidth=1.6, label=case_label(case))
 
-    ax.set_title(title)
     ax.set_xlabel(x_label)
-    ax.set_ylabel("Heat Flux (W/cm^2)")
+    ax.set_ylabel("Heat flux, $q$ (W/cm²)")
     ax.grid(True, linestyle="--", alpha=0.4)
     ax.legend()
     fig.tight_layout()
@@ -319,17 +317,15 @@ def main() -> None:
     plot_comparison(
         cases,
         "surface_temperature_C",
-        "Wall Temperature / Surface Temperature (degC)",
+        "Wall temperature, $T_{\\mathrm{w}}$ (°C)",
         plots_dir / "heat_flux_vs_wall_temperature.png",
-        "Heat Flux vs Wall Temperature",
         args.downsample,
     )
     plot_comparison(
         cases,
         "wall_superheat_C",
-        "Wall Superheat (degC)",
+        "Wall superheat, $\\Delta T$ (°C)",
         plots_dir / "heat_flux_vs_wall_superheat.png",
-        "Heat Flux vs Wall Superheat",
         args.downsample,
     )
     write_summary(output_dir, cases)
