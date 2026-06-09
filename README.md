@@ -78,13 +78,17 @@ python scripts\run_multi_case_comparison.py
 The script reads the raw folders under
 `Y:\0_Ishraq\New Pool Boiling Video`, looks up metadata in
 `metadata\Pool Boiling Test Log.xlsx`, and writes combined plots plus CSV/JSON
-summaries to `demos\Boiling-412-413-416-417\generated`.
+summaries to `demos\Boiling-412-413-416-417\generated`. By default, only the
+heating portion of each case is included: temperature samples are kept when the
+aligned last column of `DC_power.lvm` is greater than `0 W`.
 
 To compare a different set of cases:
 
 ```powershell
 python scripts\run_multi_case_comparison.py --test-ids Boiling-145 Boiling-146 Boiling-147
 ```
+
+Use `--power-threshold-w` if a different positive-power cutoff is needed.
 
 ## Notes for Contributors
 

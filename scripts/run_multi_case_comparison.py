@@ -21,7 +21,7 @@ import openpyxl
 import pandas as pd
 from pyXSteam.XSteam import XSteam
 
-from run_single_case_demo import compute_temperature_quantities, read_lvm
+from run_single_case_demo import compute_temperature_quantities, parse_lvm_start_time_seconds, read_lvm
 
 
 DEFAULT_CASES = ["Boiling-412", "Boiling-413", "Boiling-416", "Boiling-417"]
@@ -76,11 +76,46 @@ def pressure_stats(folder: Path, target_pressure_kpa: float) -> dict[str, float]
     }
 
 
+def heating_mask_from_dc_power(folder: Path, time_s: np.ndarray, threshold_w: float) -> tuple[np.ndarray, dict[str, float]]:
+    dc_path = folder / "DC_power.lvm"
+    if not dc_path.exists():
+        raise FileNotFoundError(f"DC power file not found: {dc_path}")
+
+    dc = read_lvm(folder, "DC_power.lvm")
+    dc_time = dc.iloc[:, 0].to_numpy(dtype=float)
+    dc_power = dc.iloc[:, -1].to_numpy(dtype=float)
+
+    time_offset = parse_lvm_start_time_seconds(dc_path) - parse_lvm_start_time_seconds(folder / "Temperature.lvm")
+    aligned_dc_time = dc_time + time_offset
+
+    finite_dc = np.isfinite(aligned_dc_time) & np.isfinite(dc_power)
+    aligned_dc_time = aligned_dc_time[finite_dc]
+    dc_power = dc_power[finite_dc]
+    order = np.argsort(aligned_dc_time)
+    aligned_dc_time = aligned_dc_time[order]
+    dc_power = dc_power[order]
+
+    interpolated_power = np.interp(time_s, aligned_dc_time, dc_power, left=0.0, right=0.0)
+    heating_mask = interpolated_power > threshold_w
+    if not np.any(heating_mask):
+        raise ValueError(f"No heating samples found in {folder} using power threshold {threshold_w} W")
+
+    heating_times = time_s[heating_mask]
+    return heating_mask, {
+        "heating_start_time_s": float(np.nanmin(heating_times)),
+        "heating_end_time_s": float(np.nanmax(heating_times)),
+        "heating_duration_s": float(np.nanmax(heating_times) - np.nanmin(heating_times)),
+        "max_dc_power_W": float(np.nanmax(dc_power)),
+        "mean_dc_power_during_heating_W": float(np.nanmean(interpolated_power[heating_mask])),
+    }
+
+
 def load_curve_case(
     test_id: str,
     raw_root: Path,
     test_log: dict[str, dict[str, object]],
     target_pressure_kpa: float,
+    power_threshold_w: float,
 ) -> dict[str, object]:
     test_id = normalize_test_id(test_id)
     folder = raw_root / test_id
@@ -96,6 +131,7 @@ def load_curve_case(
     surface_temperature = temp_data["surface_temperature"]
     wall_superheat = surface_temperature - t_sat_c
     time_s = temp_data["time_s"]
+    heating_mask, heating_stats = heating_mask_from_dc_power(folder, time_s, power_threshold_w)
 
     log_row = test_log.get(test_id, {})
     power_value = log_row.get("MagnaDC \nPower (W)")
@@ -107,20 +143,23 @@ def load_curve_case(
     return {
         "test_id": test_id,
         "folder": str(folder),
-        "time_s": time_s,
-        "surface_temperature_C": surface_temperature,
-        "wall_superheat_C": wall_superheat,
-        "heat_flux_W_cm2": heat_flux,
+        "time_s": time_s[heating_mask],
+        "surface_temperature_C": surface_temperature[heating_mask],
+        "wall_superheat_C": wall_superheat[heating_mask],
+        "heat_flux_W_cm2": heat_flux[heating_mask],
         "T_sat_C": float(t_sat_c),
         "mean_liquid_temp_C": float(np.nanmean(temp["Liquid Temp"].to_numpy(dtype=float))),
         "mean_vapour_temp_C": float(np.nanmean(temp["Vapour Temp"].to_numpy(dtype=float))),
-        "max_heat_flux_W_cm2": float(np.nanmax(heat_flux)),
-        "time_at_max_heat_flux_s": float(time_s[np.nanargmax(heat_flux)]),
-        "max_surface_temp_C": float(np.nanmax(surface_temperature)),
-        "time_at_max_surface_temp_s": float(time_s[np.nanargmax(surface_temperature)]),
+        "max_heat_flux_W_cm2": float(np.nanmax(heat_flux[heating_mask])),
+        "time_at_max_heat_flux_s": float(time_s[heating_mask][np.nanargmax(heat_flux[heating_mask])]),
+        "max_surface_temp_C": float(np.nanmax(surface_temperature[heating_mask])),
+        "time_at_max_surface_temp_s": float(
+            time_s[heating_mask][np.nanargmax(surface_temperature[heating_mask])]
+        ),
         "applied_power_W": power_w,
         "status": log_row.get("Status"),
         "surface": log_row.get("Surface"),
+        **heating_stats,
         **stats,
     }
 
@@ -173,6 +212,10 @@ def write_summary(output_dir: Path, cases: list[dict[str, object]]) -> None:
         "time_at_max_heat_flux_s",
         "max_surface_temp_C",
         "time_at_max_surface_temp_s",
+        "heating_start_time_s",
+        "heating_end_time_s",
+        "heating_duration_s",
+        "mean_dc_power_during_heating_W",
     ]
     rows = [{key: case.get(key) for key in scalar_keys} for case in cases]
     with (output_dir / "summary.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -208,6 +251,7 @@ def write_summary(output_dir: Path, cases: list[dict[str, object]]) -> None:
         "Max heat flux (W/cm^2) | Max surface temp (C) |\n"
         "| --- | ---: | --- | ---: | ---: | ---: | ---: |\n"
         f"{markdown_rows}\n\n"
+        "Only samples with positive DC output power are included in these generated curves.\n\n"
         "Generated plots:\n\n"
         "- [Heat flux vs wall temperature](plots/heat_flux_vs_wall_temperature.png)\n"
         "- [Heat flux vs wall superheat](plots/heat_flux_vs_wall_superheat.png)\n",
@@ -246,6 +290,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", default=r"demos\Boiling-412-413-416-417\generated")
     parser.add_argument("--target-pressure", type=float, default=97.7)
     parser.add_argument(
+        "--power-threshold-w",
+        type=float,
+        default=0.0,
+        help="Keep only temperature samples whose aligned DC output power is greater than this threshold.",
+    )
+    parser.add_argument(
         "--downsample",
         type=int,
         default=5,
@@ -262,7 +312,7 @@ def main() -> None:
 
     test_log = load_test_log(Path(args.test_log))
     cases = [
-        load_curve_case(test_id, Path(args.raw_root), test_log, args.target_pressure)
+        load_curve_case(test_id, Path(args.raw_root), test_log, args.target_pressure, args.power_threshold_w)
         for test_id in args.test_ids
     ]
 

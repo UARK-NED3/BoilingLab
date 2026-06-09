@@ -25,6 +25,11 @@ The two primary comparison plots are:
 - heat flux vs. wall temperature
 - heat flux vs. wall superheat
 
+Only the heating portion of each case is included. The script aligns
+`DC_power.lvm` to `Temperature.lvm` using the file start times, interpolates the
+last `DC_power.lvm` column onto the temperature timestamps, and keeps samples
+where the power is greater than `0 W`.
+
 The test log marks all four demo cases as `Failure: CHF not reached`, so these
 plots are for comparing curve shape and heat-load response rather than ranking
 confirmed CHF values.

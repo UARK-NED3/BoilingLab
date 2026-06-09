@@ -12,7 +12,11 @@
     "max_heat_flux_W_cm2": 142.0218777952753,
     "time_at_max_heat_flux_s": 462.8,
     "max_surface_temp_C": 112.73542023600007,
-    "time_at_max_surface_temp_s": 538.8
+    "time_at_max_surface_temp_s": 538.8,
+    "heating_start_time_s": 5.2,
+    "heating_end_time_s": 541.9,
+    "heating_duration_s": 536.6999999999999,
+    "mean_dc_power_during_heating_W": 149.72504001694202
   },
   {
     "test_id": "Boiling-413",
@@ -26,8 +30,12 @@
     "mean_vapour_temp_C": 47.83999019084746,
     "max_heat_flux_W_cm2": 163.11568639370063,
     "time_at_max_heat_flux_s": 393.6,
-    "max_surface_temp_C": 159.59306365299997,
-    "time_at_max_surface_temp_s": 574.8
+    "max_surface_temp_C": 159.17895174600005,
+    "time_at_max_surface_temp_s": 571.2,
+    "heating_start_time_s": 5.0,
+    "heating_end_time_s": 573.0,
+    "heating_duration_s": 568.0,
+    "mean_dc_power_during_heating_W": 178.64970755129238
   },
   {
     "test_id": "Boiling-416",
@@ -42,7 +50,11 @@
     "max_heat_flux_W_cm2": 267.23561508661413,
     "time_at_max_heat_flux_s": 754.0,
     "max_surface_temp_C": 166.968477178,
-    "time_at_max_surface_temp_s": 749.6
+    "time_at_max_surface_temp_s": 749.6,
+    "heating_start_time_s": 5.4,
+    "heating_end_time_s": 758.5,
+    "heating_duration_s": 753.1,
+    "mean_dc_power_during_heating_W": 227.64914918957385
   },
   {
     "test_id": "Boiling-417",
@@ -57,6 +69,10 @@
     "max_heat_flux_W_cm2": 277.95529029921306,
     "time_at_max_heat_flux_s": 608.4,
     "max_surface_temp_C": 172.869782979,
-    "time_at_max_surface_temp_s": 132.4
+    "time_at_max_surface_temp_s": 132.4,
+    "heating_start_time_s": 4.8,
+    "heating_end_time_s": 674.6,
+    "heating_duration_s": 669.8000000000001,
+    "mean_dc_power_during_heating_W": 247.97395298375767
   }
 ]
