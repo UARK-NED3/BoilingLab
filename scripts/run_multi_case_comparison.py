@@ -168,7 +168,7 @@ def case_label(case: dict[str, object]) -> str:
     power = case.get("applied_power_W")
     if power is None:
         return str(case["test_id"])
-    return f"{case['test_id']} ({power:g} W)"
+    return f"$P_{{\\mathrm{{load}}}}$ = {power:g} W"
 
 
 def plot_comparison(
@@ -184,12 +184,13 @@ def plot_comparison(
         y = np.asarray(case["heat_flux_W_cm2"], dtype=float)
         finite = np.isfinite(x) & np.isfinite(y)
         step = max(1, downsample)
-        ax.plot(x[finite][::step], y[finite][::step], linewidth=1.6, label=case_label(case))
+        ax.plot(x[finite][::step], y[finite][::step], linewidth=2.4, label=case_label(case))
 
-    ax.set_xlabel(x_label)
-    ax.set_ylabel("Heat flux, $q$ (W/cm²)")
+    ax.set_xlabel(x_label, fontsize=22)
+    ax.set_ylabel("Heat flux, $q^{\\prime\\prime}$ (W/cm²)", fontsize=22)
     ax.grid(True, linestyle="--", alpha=0.4)
-    ax.legend()
+    ax.tick_params(axis="both", which="major", labelsize=18)
+    ax.legend(fontsize=18)
     fig.tight_layout()
     fig.savefig(output_path, dpi=220)
     plt.close(fig)
