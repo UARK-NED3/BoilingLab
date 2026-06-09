@@ -184,7 +184,16 @@ def plot_comparison(
         y = np.asarray(case["heat_flux_W_cm2"], dtype=float)
         finite = np.isfinite(x) & np.isfinite(y)
         step = max(1, downsample)
-        ax.plot(x[finite][::step], y[finite][::step], linewidth=2.4, label=case_label(case))
+        line = ax.plot(x[finite][::step], y[finite][::step], linewidth=2.4, label=case_label(case))[0]
+        power = case.get("applied_power_W")
+        if power is not None:
+            ax.axhline(
+                y=float(power),
+                color=line.get_color(),
+                linestyle="--",
+                linewidth=1.8,
+                alpha=0.75,
+            )
 
     ax.set_xlabel(x_label, fontsize=22)
     ax.set_ylabel("Heat flux, $q^{\\prime\\prime}$ (W/cm²)", fontsize=22)
