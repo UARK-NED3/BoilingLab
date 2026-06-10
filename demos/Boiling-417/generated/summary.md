@@ -58,3 +58,9 @@ Notebook marker values are reproduced for comparison. If the test log says CHF w
 | `ae_wfs_spectrogram_chunk_size` | `419843` |
 | `ae_wfs_spectrogram_nperseg` | `8192` |
 | `ae_wfs_spectrogram_max_frequency_Hz` | `250000.0` |
+| `ae_wfs_band_min_Hz` | `0.0` |
+| `ae_wfs_band_max_Hz` | `250000.0` |
+| `ae_wfs_band_power_time_bins` | `2400` |
+| `ae_wfs_band_power_min_V2` | `5.813551464174776e-09` |
+| `ae_wfs_band_power_max_V2` | `4.988348159708457e-05` |
+| `ae_wfs_band_power_mean_V2` | `4.854611507127646e-06` |

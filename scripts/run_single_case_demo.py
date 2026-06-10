@@ -124,6 +124,26 @@ def save_line_plot(path: Path, x, y, title: str, xlabel: str, ylabel: str, color
     plt.close(fig)
 
 
+def integrate_band_power(
+    frequencies: np.ndarray,
+    times: np.ndarray,
+    psd: np.ndarray,
+    band_min_hz: float,
+    band_max_hz: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    band_mask = (frequencies >= band_min_hz) & (frequencies <= band_max_hz)
+    if not np.any(band_mask):
+        raise ValueError(
+            f"No PSD frequency bins found between {band_min_hz:g} and {band_max_hz:g} Hz"
+        )
+
+    band_integrated_power = np.trapezoid(psd[band_mask, :], frequencies[band_mask], axis=0)
+    band_integrated_power_db = 10 * np.log10(band_integrated_power + np.finfo(float).tiny)
+    if len(times) != len(band_integrated_power):
+        raise ValueError("PSD time axis length does not match integrated power length.")
+    return band_integrated_power, band_integrated_power_db
+
+
 def save_hydrophone_analysis(
     folder: Path,
     plots_dir: Path,
@@ -204,14 +224,13 @@ def save_hydrophone_analysis(
         nperseg=nperseg,
         noverlap=noverlap,
     )
-    band_mask = (psd_frequencies >= band_min_hz) & (psd_frequencies <= band_max_hz)
-    if not np.any(band_mask):
-        raise ValueError(
-            f"No PSD frequency bins found between {band_min_hz:g} and {band_max_hz:g} Hz"
-        )
-
-    band_integrated_power = np.trapezoid(psd[band_mask, :], psd_frequencies[band_mask], axis=0)
-    band_integrated_power_db = 10 * np.log10(band_integrated_power + np.finfo(float).tiny)
+    band_integrated_power, band_integrated_power_db = integrate_band_power(
+        psd_frequencies,
+        psd_times,
+        psd,
+        band_min_hz=band_min_hz,
+        band_max_hz=band_max_hz,
+    )
 
     band_power_df = pd.DataFrame(
         {
@@ -415,6 +434,8 @@ def save_wfs_ae_spectrogram(
     plots_dir: Path,
     channel: int,
     max_freq_hz: float,
+    band_min_hz: float,
+    band_max_hz: float,
     vmin_db: float,
     vmax_db: float,
 ) -> dict[str, object]:
@@ -452,6 +473,22 @@ def save_wfs_ae_spectrogram(
         n_time_bins=px_wide,
     )
     sxx_db = 10 * np.log10(np.maximum(sxx, np.finfo(float).tiny))
+    band_integrated_power, band_integrated_power_db = integrate_band_power(
+        frequencies,
+        times,
+        sxx,
+        band_min_hz=band_min_hz,
+        band_max_hz=band_max_hz,
+    )
+
+    band_power_df = pd.DataFrame(
+        {
+            "Time (s)": times,
+            "Band-integrated AE waveform power proxy (V^2)": band_integrated_power,
+            "Band-integrated AE waveform power proxy (dB re V^2)": band_integrated_power_db,
+        }
+    )
+    band_power_df.to_csv(plots_dir.parent / "ae_wfs_band_integrated_power.csv", index=False)
 
     freq_mask = frequencies <= max_freq_hz
     if not np.any(freq_mask):
@@ -486,6 +523,19 @@ def save_wfs_ae_spectrogram(
     fig.savefig(plots_dir / "ae_wfs_spectrogram.png", dpi=180)
     plt.close(fig)
 
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(times, band_integrated_power_db, color="tab:green", linewidth=1.8)
+    ax.set_xlim(times[0], times[-1])
+    ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
+    ax.set_ylabel("Band-integrated power (dB re V$^2$)", fontsize=20, fontname="Arial")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.tick_params(axis="both", which="major", labelsize=16, direction="in", top=True, right=True)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontname("Arial")
+    fig.subplots_adjust(left=0.16, bottom=0.18, right=0.98, top=0.95)
+    fig.savefig(plots_dir / "ae_wfs_band_integrated_power.png", dpi=180)
+    plt.close(fig)
+
     return {
         "ae_wfs_available": True,
         "ae_wfs_file": str(wfs_path),
@@ -499,6 +549,12 @@ def save_wfs_ae_spectrogram(
         "ae_wfs_spectrogram_chunk_size": int(chunk_size),
         "ae_wfs_spectrogram_nperseg": int(nperseg_used),
         "ae_wfs_spectrogram_max_frequency_Hz": float(max_freq_hz),
+        "ae_wfs_band_min_Hz": float(band_min_hz),
+        "ae_wfs_band_max_Hz": float(band_max_hz),
+        "ae_wfs_band_power_time_bins": int(len(times)),
+        "ae_wfs_band_power_min_V2": float(np.nanmin(band_integrated_power)),
+        "ae_wfs_band_power_max_V2": float(np.nanmax(band_integrated_power)),
+        "ae_wfs_band_power_mean_V2": float(np.nanmean(band_integrated_power)),
     }
 
 
@@ -652,6 +708,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
                     plots_dir,
                     channel=args.wfs_channel,
                     max_freq_hz=args.wfs_max_freq_hz,
+                    band_min_hz=args.wfs_band_min_hz,
+                    band_max_hz=args.wfs_band_max_hz,
                     vmin_db=args.wfs_vmin_db,
                     vmax_db=args.wfs_vmax_db,
                 )
@@ -720,6 +778,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=250000.0,
         help="Upper frequency limit for the AE waveform spectrogram.",
+    )
+    parser.add_argument(
+        "--wfs-band-min-hz",
+        type=float,
+        default=0.0,
+        help="Lower frequency bound for band-integrated AE waveform PSD.",
+    )
+    parser.add_argument(
+        "--wfs-band-max-hz",
+        type=float,
+        default=250000.0,
+        help="Upper frequency bound for band-integrated AE waveform PSD.",
     )
     parser.add_argument(
         "--wfs-vmin-db",

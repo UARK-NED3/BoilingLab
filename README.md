@@ -80,9 +80,13 @@ python scripts\run_single_case_demo.py --include-wfs
 ```
 
 This decodes the waveform with `decode-wfs`, uses channel 1 by default, and
-writes `generated\plots\ae_wfs_spectrogram.png`. Use `--wfs-channel` to select
-a different waveform channel and `--wfs-max-freq-hz` to change the plotted
-frequency range.
+writes `generated\plots\ae_wfs_spectrogram.png`. It also integrates the AE
+waveform PSD over frequency to create
+`generated\ae_wfs_band_integrated_power.csv` and
+`generated\plots\ae_wfs_band_integrated_power.png`. Use `--wfs-channel` to
+select a different waveform channel, `--wfs-max-freq-hz` to change the plotted
+frequency range, and `--wfs-band-min-hz` / `--wfs-band-max-hz` to change the
+integrated PSD band.
 
 For a faster thermal-only run:
 
