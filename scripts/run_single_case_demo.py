@@ -135,7 +135,7 @@ def save_temperature_profile_plot(
     title: str,
 ) -> None:
     fig, ax = plt.subplots(figsize=(14, 6))
-    linewidth = 2.2
+    linewidth = 1.6
     colors = ["tab:blue", "tab:orange", "tab:green", "tab:red"]
     for index, color in enumerate(colors):
         ax.plot(
@@ -144,7 +144,7 @@ def save_temperature_profile_plot(
             color=color,
             linewidth=linewidth,
             linestyle="-",
-            label=f"TC {index + 1}",
+            label=rf"$T_{{\mathrm{{TC{index + 1}}}}}$",
         )
     ax.plot(
         time_s,
@@ -152,8 +152,9 @@ def save_temperature_profile_plot(
         color="tab:purple",
         linewidth=linewidth,
         linestyle="-",
-        label="Surface",
+        label=r"$T_{\mathrm{w}}$",
     )
+    ax.set_xlim(0, float(time_s[-1]))
     ax.set_title(title)
     ax.set_xlabel("Time, $t$ (s)", fontsize=18, fontname="Arial")
     ax.set_ylabel("Temperature, $T$ ($^\\circ$C)", fontsize=18, fontname="Arial")
@@ -161,7 +162,7 @@ def save_temperature_profile_plot(
     ax.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True, right=True)
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontname("Arial")
-    ax.legend(frameon=False, fontsize=13, ncol=5, loc="upper right")
+    ax.legend(frameon=False, fontsize=13, ncol=1, loc="upper right")
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
