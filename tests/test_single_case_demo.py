@@ -94,8 +94,10 @@ class BoilingCurvePlotTests(unittest.TestCase):
 
             save_boiling_curve_plot(
                 path,
+                time_s=np.array([0.0, 1.0, 2.0]),
                 wall_temperature=np.array([90.0, 100.0, 110.0]),
                 heat_flux=np.array([10.0, 25.0, 40.0]),
+                off_time_s=1.5,
             )
 
             self.assertTrue(path.exists())

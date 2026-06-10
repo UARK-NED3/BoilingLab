@@ -435,29 +435,58 @@ def save_heat_flux_power_plot(
 
 def save_boiling_curve_plot(
     path: Path,
+    time_s: np.ndarray,
     wall_temperature: np.ndarray,
     heat_flux: np.ndarray,
+    off_time_s: float | None = None,
 ) -> None:
+    time_s = np.asarray(time_s, dtype=float)
     wall_temperature = np.asarray(wall_temperature, dtype=float)
     heat_flux = np.asarray(heat_flux, dtype=float)
-    finite = np.isfinite(wall_temperature) & np.isfinite(heat_flux)
+    finite = np.isfinite(time_s) & np.isfinite(wall_temperature) & np.isfinite(heat_flux)
     if not np.any(finite):
         raise ValueError("No finite wall-temperature and heat-flux pairs found for boiling curve.")
 
     fig, ax = plt.subplots(figsize=(8, 7))
-    ax.plot(
-        wall_temperature[finite],
-        heat_flux[finite],
-        color="tab:red",
-        linewidth=1.6,
-        linestyle="-",
-    )
+    linewidth = 2.8
+    if off_time_s is None:
+        ax.plot(
+            wall_temperature[finite],
+            heat_flux[finite],
+            color="tab:red",
+            linewidth=linewidth,
+            linestyle="-",
+            label=r"$t < t_{\mathrm{off}}$",
+        )
+    else:
+        heating = finite & (time_s < off_time_s)
+        cooling = finite & (time_s >= off_time_s)
+        if np.any(heating):
+            ax.plot(
+                wall_temperature[heating],
+                heat_flux[heating],
+                color="tab:red",
+                linewidth=linewidth,
+                linestyle="-",
+                label="Heating",
+            )
+        if np.any(cooling):
+            ax.plot(
+                wall_temperature[cooling],
+                heat_flux[cooling],
+                color="tab:blue",
+                linewidth=linewidth,
+                linestyle="-",
+                label="Cooling",
+            )
     ax.set_xlabel("Wall temperature, $T_{\\mathrm{w}}$ ($^\\circ$C)", fontsize=18, fontname="Arial")
     ax.set_ylabel("Heat flux, $q''$ (W/cm$^2$)", fontsize=18, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
     ax.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True, right=True)
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontname("Arial")
+    if len(ax.lines) > 1:
+        ax.legend(frameon=False, fontsize=14, loc="best")
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -1558,8 +1587,10 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     )
     save_boiling_curve_plot(
         plots_dir / "boiling_curve.png",
+        time_s,
         surface_temperature,
         heat_flux,
+        off_time_s=shut_time,
     )
 
     if not args.skip_sensors:
