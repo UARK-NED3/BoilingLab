@@ -18,6 +18,8 @@ from scripts.run_single_case_demo import (
     power_centroid_alignment,
     required_single_case_figure_paths,
     save_characteristic_frequency_analysis,
+    save_hydrophone_analysis,
+    save_wfs_ae_spectrogram,
     validate_required_single_case_figures,
 )
 
@@ -251,6 +253,54 @@ class SingleCaseOutputContractTests(unittest.TestCase):
 
             with self.assertRaisesRegex(FileNotFoundError, "ae_wfs_characteristic_frequencies"):
                 validate_required_single_case_figures(plots_dir)
+
+    def test_missing_hydrophone_file_creates_required_placeholder_figures(self):
+        with TemporaryDirectory() as tmpdir:
+            case_dir = Path(tmpdir) / "case"
+            plots_dir = Path(tmpdir) / "plots"
+            case_dir.mkdir()
+            plots_dir.mkdir()
+
+            summary = save_hydrophone_analysis(
+                case_dir,
+                plots_dir,
+                band_min_hz=0.0,
+                band_max_hz=6000.0,
+                oscillation_start_s=300.0,
+                oscillation_end_s=700.0,
+                oscillation_max_frequency_hz=0.2,
+            )
+
+            self.assertFalse(summary["hydrophone_available"])
+            self.assertTrue((plots_dir / "hydrophone_spectrogram.png").exists())
+            self.assertTrue((plots_dir / "hydrophone_band_integrated_power.png").exists())
+            self.assertTrue((plots_dir / "hydrophone_characteristic_frequencies.png").exists())
+
+    def test_missing_wfs_file_creates_required_placeholder_figures(self):
+        with TemporaryDirectory() as tmpdir:
+            case_dir = Path(tmpdir) / "case"
+            plots_dir = Path(tmpdir) / "plots"
+            case_dir.mkdir()
+            plots_dir.mkdir()
+
+            summary = save_wfs_ae_spectrogram(
+                case_dir,
+                plots_dir,
+                channel=1,
+                max_freq_hz=250000.0,
+                band_min_hz=0.0,
+                band_max_hz=250000.0,
+                oscillation_start_s=300.0,
+                oscillation_end_s=700.0,
+                oscillation_max_frequency_hz=0.2,
+                vmin_db=-180.0,
+                vmax_db=-40.0,
+            )
+
+            self.assertFalse(summary["ae_wfs_available"])
+            self.assertTrue((plots_dir / "ae_wfs_spectrogram.png").exists())
+            self.assertTrue((plots_dir / "ae_wfs_band_integrated_power.png").exists())
+            self.assertTrue((plots_dir / "ae_wfs_characteristic_frequencies.png").exists())
 
 
 if __name__ == "__main__":

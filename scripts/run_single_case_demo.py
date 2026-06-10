@@ -61,6 +61,37 @@ def validate_required_single_case_figures(plots_dir: Path) -> None:
         )
 
 
+def save_unavailable_plot(path: Path, title: str, message: str) -> None:
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.axis("off")
+    ax.text(
+        0.5,
+        0.58,
+        title,
+        ha="center",
+        va="center",
+        fontsize=22,
+        fontweight="bold",
+        transform=ax.transAxes,
+    )
+    ax.text(
+        0.5,
+        0.42,
+        message,
+        ha="center",
+        va="center",
+        fontsize=16,
+        transform=ax.transAxes,
+    )
+    fig.savefig(path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def save_unavailable_plots(plots_dir: Path, plots: dict[str, tuple[str, str]]) -> None:
+    for filename, (title, message) in plots.items():
+        save_unavailable_plot(plots_dir / filename, title, message)
+
+
 def read_lvm(folder: Path, filename: str) -> pd.DataFrame:
     return pd.read_csv(folder / filename, skiprows=LVM_SKIP_ROWS, sep="\t")
 
@@ -804,6 +835,23 @@ def save_hydrophone_analysis(
 ) -> dict[str, object]:
     path = folder / "Hydrophones.lvm"
     if not path.exists():
+        save_unavailable_plots(
+            plots_dir,
+            {
+                "hydrophone_spectrogram.png": (
+                    "Hydrophone spectrogram unavailable",
+                    "Hydrophones.lvm was not found for this test.",
+                ),
+                "hydrophone_band_integrated_power.png": (
+                    "Hydrophone band-integrated power unavailable",
+                    "Hydrophones.lvm was not found for this test.",
+                ),
+                "hydrophone_characteristic_frequencies.png": (
+                    "Hydrophone characteristic frequencies unavailable",
+                    "Hydrophones.lvm was not found for this test.",
+                ),
+            },
+        )
         return {"hydrophone_available": False}
 
     hydrophones = pd.read_csv(
@@ -1151,6 +1199,23 @@ def save_wfs_ae_spectrogram(
 ) -> dict[str, object]:
     wfs_path = find_wfs_file(folder)
     if wfs_path is None:
+        save_unavailable_plots(
+            plots_dir,
+            {
+                "ae_wfs_spectrogram.png": (
+                    "AE spectrogram unavailable",
+                    ".wfs waveform file was not found for this test.",
+                ),
+                "ae_wfs_band_integrated_power.png": (
+                    "AE band-integrated power unavailable",
+                    ".wfs waveform file was not found for this test.",
+                ),
+                "ae_wfs_characteristic_frequencies.png": (
+                    "AE characteristic frequencies unavailable",
+                    ".wfs waveform file was not found for this test.",
+                ),
+            },
+        )
         return {"ae_wfs_available": False}
 
     try:
