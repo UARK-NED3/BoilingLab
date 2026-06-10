@@ -1,4 +1,7 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import numpy as np
 
@@ -8,6 +11,7 @@ from scripts.run_single_case_demo import (
     detect_dnb_time,
     integrate_band_power,
     power_centroid_alignment,
+    save_characteristic_frequency_analysis,
 )
 
 
@@ -124,6 +128,40 @@ class PowerCentroidAlignmentTests(unittest.TestCase):
         self.assertGreater(result["zero_lag_correlation"], 0.95)
         self.assertGreater(result["mean_centroid_z_at_power_peaks"], 0.0)
         self.assertLess(result["mean_centroid_z_at_power_valleys"], 0.0)
+
+
+class AcousticEventMarkerPlotTests(unittest.TestCase):
+    def test_characteristic_frequency_plot_adds_event_markers(self):
+        times = np.linspace(0.0, 4.0, 5)
+        frequencies = np.array([0.0, 1000.0, 2000.0])
+        psd = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [1.0, 1.0, 1.0, 1.0, 1.0],
+                [0.5, 0.5, 0.5, 0.5, 0.5],
+            ]
+        )
+
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            with patch("scripts.run_single_case_demo.add_event_markers") as markers:
+                save_characteristic_frequency_analysis(
+                    "unit",
+                    times,
+                    frequencies,
+                    psd,
+                    output_dir,
+                    output_dir,
+                    band_min_hz=0.0,
+                    band_max_hz=2000.0,
+                    color="tab:blue",
+                    dnb_time_s=1.0,
+                    off_time_s=3.0,
+                )
+
+        self.assertEqual(markers.call_count, 1)
+        self.assertEqual(markers.call_args.kwargs["dnb_time_s"], 1.0)
+        self.assertEqual(markers.call_args.kwargs["off_time_s"], 3.0)
 
 
 if __name__ == "__main__":

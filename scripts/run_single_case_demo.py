@@ -388,6 +388,8 @@ def save_characteristic_frequency_analysis(
     band_min_hz: float,
     band_max_hz: float,
     color: str,
+    dnb_time_s: float | None = None,
+    off_time_s: float | None = None,
 ) -> dict[str, object]:
     peak_frequency, centroid_frequency, bandwidth = characteristic_frequencies(
         frequencies,
@@ -419,6 +421,7 @@ def save_characteristic_frequency_analysis(
     ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
     ax.set_ylabel("Frequency, $f$ (kHz)", fontsize=20, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
+    add_event_markers(ax, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
     ax.legend(frameon=False, fontsize=15)
     ax.tick_params(axis="both", which="major", labelsize=16, direction="in", top=True, right=True)
     for label in ax.get_xticklabels() + ax.get_yticklabels():
@@ -515,6 +518,8 @@ def save_power_centroid_overlay(
     plots_dir: Path,
     window_start_s: float,
     window_end_s: float,
+    dnb_time_s: float | None = None,
+    off_time_s: float | None = None,
 ) -> dict[str, object]:
     mask = (
         (time_s >= window_start_s)
@@ -549,6 +554,7 @@ def save_power_centroid_overlay(
     ax_power.set_ylabel("Band-integrated power (dB re V$^2$)", fontsize=18, fontname="Arial")
     ax_centroid.set_ylabel("Spectral centroid, $f_c$ (kHz)", fontsize=18, fontname="Arial")
     ax_power.grid(True, linestyle="--", alpha=0.35)
+    add_event_markers(ax_power, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
     ax_power.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True)
     ax_centroid.tick_params(axis="y", which="major", labelsize=15, direction="in", right=True)
     for label in (
@@ -700,6 +706,8 @@ def save_hydrophone_analysis(
     oscillation_start_s: float,
     oscillation_end_s: float,
     oscillation_max_frequency_hz: float,
+    dnb_time_s: float | None = None,
+    off_time_s: float | None = None,
 ) -> dict[str, object]:
     path = folder / "Hydrophones.lvm"
     if not path.exists():
@@ -759,6 +767,7 @@ def save_hydrophone_analysis(
     ax.set_ylabel("Frequency, $f$ (kHz)", fontsize=24, fontname="Arial")
     ax.set_xlabel("Time, $t$ (s)", fontsize=24, fontname="Arial")
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:.1f}"))
+    add_event_markers(ax, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
     colorbar = fig.colorbar(spectrogram_image, ax=ax, fraction=0.035, pad=0.03)
     colorbar.set_label("Power (dB)", fontsize=22, fontname="Arial")
     colorbar.ax.tick_params(labelsize=18)
@@ -798,6 +807,7 @@ def save_hydrophone_analysis(
     ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
     ax.set_ylabel("Band-integrated power (dB re V²)", fontsize=20, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
+    add_event_markers(ax, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
     ax.tick_params(axis="both", which="major", labelsize=16, direction="in", top=True, right=True)
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontname("Arial")
@@ -827,6 +837,8 @@ def save_hydrophone_analysis(
             band_min_hz=band_min_hz,
             band_max_hz=band_max_hz,
             color="tab:blue",
+            dnb_time_s=dnb_time_s,
+            off_time_s=off_time_s,
         )
     )
     _, hydrophone_centroid_frequency, _ = characteristic_frequencies(
@@ -844,6 +856,8 @@ def save_hydrophone_analysis(
             plots_dir,
             window_start_s=oscillation_start_s,
             window_end_s=oscillation_end_s,
+            dnb_time_s=dnb_time_s,
+            off_time_s=off_time_s,
         )
     )
     summary.update(
@@ -1341,6 +1355,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
                 oscillation_start_s=args.oscillation_start_s,
                 oscillation_end_s=args.oscillation_end_s,
                 oscillation_max_frequency_hz=args.oscillation_max_frequency_hz,
+                dnb_time_s=float(time_s[dnb_idx]),
+                off_time_s=shut_time,
             )
         )
         summary.update(save_ae_analysis(folder, plots_dir))
