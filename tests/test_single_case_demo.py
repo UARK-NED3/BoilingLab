@@ -9,12 +9,16 @@ import numpy as np
 from scripts.run_single_case_demo import (
     add_event_markers,
     band_power_oscillation_spectrum,
+    build_parser,
     characteristic_frequencies,
+    default_output_dir,
     detect_dnb_time,
     detect_wall_temperature_peak_time,
     integrate_band_power,
     power_centroid_alignment,
+    required_single_case_figure_paths,
     save_characteristic_frequency_analysis,
+    validate_required_single_case_figures,
 )
 
 
@@ -223,6 +227,30 @@ class AcousticEventMarkerPlotTests(unittest.TestCase):
                 )
 
         set_xlim.assert_any_call(0, times[-1])
+
+
+class SingleCaseOutputContractTests(unittest.TestCase):
+    def test_default_output_dir_follows_test_id(self):
+        self.assertEqual(default_output_dir("416"), Path("demos") / "Boiling-416" / "generated")
+        self.assertEqual(
+            default_output_dir("Boiling-417"),
+            Path("demos") / "Boiling-417" / "generated",
+        )
+
+    def test_parser_includes_wfs_by_default_and_allows_skipping(self):
+        parser = build_parser()
+
+        self.assertTrue(parser.parse_args([]).include_wfs)
+        self.assertFalse(parser.parse_args(["--skip-wfs"]).include_wfs)
+
+    def test_required_figure_validation_rejects_missing_figures(self):
+        with TemporaryDirectory() as tmpdir:
+            plots_dir = Path(tmpdir)
+            for path in required_single_case_figure_paths(plots_dir)[:-1]:
+                path.write_text("placeholder", encoding="utf-8")
+
+            with self.assertRaisesRegex(FileNotFoundError, "ae_wfs_characteristic_frequencies"):
+                validate_required_single_case_figures(plots_dir)
 
 
 if __name__ == "__main__":

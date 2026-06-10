@@ -29,6 +29,36 @@ TC_LOCATION_M = np.array([0, 2.54, 5.08, 7.62]) * 1e-3
 SURFACE_LOCATION_FLAT_CU_M = 13.1826e-3
 CU_THERMAL_CONDUCTIVITY_W_MK = 392
 LVM_SKIP_ROWS = 22
+REQUIRED_SINGLE_CASE_FIGURES = (
+    "heat_flux_vs_time.png",
+    "surface_temperature.png",
+    "hydrophone_spectrogram.png",
+    "hydrophone_band_integrated_power.png",
+    "hydrophone_characteristic_frequencies.png",
+    "ae_wfs_spectrogram.png",
+    "ae_wfs_band_integrated_power.png",
+    "ae_wfs_characteristic_frequencies.png",
+)
+
+
+def normalize_test_id(test_id: str) -> str:
+    return test_id if test_id.startswith("Boiling-") else f"Boiling-{test_id}"
+
+
+def default_output_dir(test_id: str) -> Path:
+    return Path("demos") / normalize_test_id(test_id) / "generated"
+
+
+def required_single_case_figure_paths(plots_dir: Path) -> list[Path]:
+    return [plots_dir / filename for filename in REQUIRED_SINGLE_CASE_FIGURES]
+
+
+def validate_required_single_case_figures(plots_dir: Path) -> None:
+    missing = [path.name for path in required_single_case_figure_paths(plots_dir) if not path.exists()]
+    if missing:
+        raise FileNotFoundError(
+            "Single-case analysis did not generate required figures: " + ", ".join(missing)
+        )
 
 
 def read_lvm(folder: Path, filename: str) -> pd.DataFrame:
@@ -1271,9 +1301,9 @@ def save_wfs_ae_spectrogram(
 
 
 def analyze_case(args: argparse.Namespace) -> dict[str, object]:
-    test_id = args.test_id if args.test_id.startswith("Boiling-") else f"Boiling-{args.test_id}"
+    test_id = normalize_test_id(args.test_id)
     folder = Path(args.raw_root) / test_id
-    output_dir = Path(args.output_dir)
+    output_dir = Path(args.output_dir) if args.output_dir else default_output_dir(test_id)
     plots_dir = output_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1467,6 +1497,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
                     off_time_s=shut_time,
                 )
             )
+        if args.include_wfs:
+            validate_required_single_case_figures(plots_dir)
 
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     write_summary_markdown(output_dir / "summary.md", summary)
@@ -1491,7 +1523,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test-id", default="Boiling-417")
     parser.add_argument("--raw-root", default=r"Y:\0_Ishraq\New Pool Boiling Video")
-    parser.add_argument("--output-dir", default=r"demos\Boiling-417\generated")
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Output folder. Defaults to demos/<test-id>/generated.",
+    )
     parser.add_argument("--subcooling", type=float, default=57.6)
     parser.add_argument("--applied-heat-load", type=float, default=250.0)
     parser.add_argument("--target-pressure", type=float, default=97.7)
@@ -1548,7 +1584,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-wfs",
         action="store_true",
-        help="Decode any .wfs waveform file and save an AE waveform spectrogram.",
+        default=True,
+        help="Decode any .wfs waveform file and save AE waveform acoustic plots. Enabled by default.",
+    )
+    parser.add_argument(
+        "--skip-wfs",
+        action="store_false",
+        dest="include_wfs",
+        help="Skip .wfs waveform decoding for a faster run.",
     )
     parser.add_argument(
         "--wfs-channel",

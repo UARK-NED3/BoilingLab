@@ -64,29 +64,32 @@ python scripts\run_single_case_demo.py
 
 The default command analyzes `Boiling-417` from
 `Y:\0_Ishraq\New Pool Boiling Video\Boiling-417` and writes generated summary
-files and plots to `demos\Boiling-417\generated`. The generated outputs include
-thermal/pressure/DC plots plus hydrophone raw/spectrogram plots and acoustic
-emission hit/time parameter plots when `Hydrophones.lvm`, `AE_Hit.TXT`, and
-`AE_Time.TXT` are present. The hydrophone analysis also computes a
-band-integrated PSD scalar over time by integrating the PSD over frequency; this
-is a voltage-squared acoustic-power proxy unless the hydrophone signal is
-calibrated to pressure.
+files and plots to `demos\Boiling-417\generated`. A complete single-case run
+generates these eight required figures:
 
-To include the continuous acoustic-emission waveform spectrogram from a `.wfs`
-stream file, install the full requirements and run:
+- `generated\plots\heat_flux_vs_time.png`
+- `generated\plots\surface_temperature.png`
+- `generated\plots\hydrophone_spectrogram.png`
+- `generated\plots\hydrophone_band_integrated_power.png`
+- `generated\plots\hydrophone_characteristic_frequencies.png`
+- `generated\plots\ae_wfs_spectrogram.png`
+- `generated\plots\ae_wfs_band_integrated_power.png`
+- `generated\plots\ae_wfs_characteristic_frequencies.png`
 
-```powershell
-python scripts\run_single_case_demo.py --include-wfs
-```
+The generated outputs also include pressure/DC plots, hydrophone raw plots, and
+acoustic-emission hit/time parameter plots when the corresponding raw files are
+present. The hydrophone and AE waveform analyses compute band-integrated PSD
+scalars over time by integrating the PSD over frequency; these are
+voltage-squared acoustic-power proxies unless the sensors are calibrated to
+physical acoustic pressure.
 
-This decodes the waveform with `decode-wfs`, uses channel 1 by default, and
-writes `generated\plots\ae_wfs_spectrogram.png`. It also integrates the AE
-waveform PSD over frequency to create
-`generated\ae_wfs_band_integrated_power.csv` and
-`generated\plots\ae_wfs_band_integrated_power.png`. Use `--wfs-channel` to
-select a different waveform channel, `--wfs-max-freq-hz` to change the plotted
-frequency range, and `--wfs-band-min-hz` / `--wfs-band-max-hz` to change the
-integrated PSD band.
+The default run decodes the continuous acoustic-emission waveform from a `.wfs`
+stream file with `decode-wfs`, uses channel 1 by default, and writes the AE
+spectrogram, band-integrated power trace, and characteristic-frequency trace.
+Use `--wfs-channel` to select a different waveform channel, `--wfs-max-freq-hz`
+to change the plotted frequency range, and `--wfs-band-min-hz` /
+`--wfs-band-max-hz` to change the integrated PSD band. Use `--skip-wfs` when a
+faster run without continuous AE waveform plots is needed.
 
 For a faster thermal-only run:
 
