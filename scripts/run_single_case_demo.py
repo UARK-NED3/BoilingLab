@@ -365,7 +365,13 @@ def save_power_centroid_overlay(
     ):
         label.set_fontname("Arial")
     lines = power_line + centroid_line
-    ax_power.legend(lines, [line.get_label() for line in lines], frameon=False, fontsize=14)
+    ax_power.legend(
+        lines,
+        [line.get_label() for line in lines],
+        loc="lower left",
+        frameon=False,
+        fontsize=14,
+    )
     fig.subplots_adjust(left=0.14, bottom=0.17, right=0.86, top=0.96)
     fig.savefig(plots_dir / f"{prefix}_power_centroid_overlay.png", dpi=180)
     plt.close(fig)
