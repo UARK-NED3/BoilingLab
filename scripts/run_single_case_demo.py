@@ -168,7 +168,7 @@ def add_event_markers(
     off_time_s: float | None = None,
 ) -> None:
     ymin, ymax = ax.get_ylim()
-    label_y = ymax - 0.06 * (ymax - ymin)
+    label_y = ymin + 0.06 * (ymax - ymin)
     if dnb_time_s is not None:
         ax.axvline(dnb_time_s, color="black", linestyle="--", linewidth=1.3)
         ax.text(
@@ -176,7 +176,7 @@ def add_event_markers(
             label_y,
             r"$t_{\mathrm{DNB}}$",
             rotation=90,
-            va="top",
+            va="bottom",
             ha="right",
             fontsize=13,
             fontname="Arial",
@@ -189,7 +189,7 @@ def add_event_markers(
             label_y,
             r"$t_{\mathrm{off}}$",
             rotation=90,
-            va="top",
+            va="bottom",
             ha="right",
             fontsize=13,
             fontname="Arial",
