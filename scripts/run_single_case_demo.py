@@ -168,6 +168,79 @@ def save_temperature_profile_plot(
     plt.close(fig)
 
 
+def save_heat_flux_power_plot(
+    path: Path,
+    time_s: np.ndarray,
+    heat_flux: np.ndarray,
+    dc_time_s: np.ndarray | None,
+    power_w: np.ndarray | None,
+    title: str,
+) -> None:
+    fig, ax_heat_flux = plt.subplots(figsize=(14, 6))
+    linewidth = 1.6
+    heat_flux_line = ax_heat_flux.plot(
+        time_s,
+        heat_flux,
+        color="tab:red",
+        linewidth=linewidth,
+        linestyle="-",
+        label=r"$q''$",
+    )
+    ax_heat_flux.set_xlim(0, float(time_s[-1]))
+    ax_heat_flux.set_title(title)
+    ax_heat_flux.set_xlabel("Time, $t$ (s)", fontsize=18, fontname="Arial")
+    ax_heat_flux.set_ylabel("Heat flux, $q''$ (W/cm$^2$)", fontsize=18, fontname="Arial")
+    ax_heat_flux.grid(True, linestyle="--", alpha=0.4)
+    ax_heat_flux.tick_params(
+        axis="both",
+        which="major",
+        labelsize=15,
+        direction="in",
+        top=True,
+    )
+
+    lines = heat_flux_line
+    if dc_time_s is not None and power_w is not None:
+        ax_power = ax_heat_flux.twinx()
+        power_line = ax_power.plot(
+            dc_time_s,
+            power_w,
+            color="tab:blue",
+            linewidth=linewidth,
+            linestyle="-",
+            label=r"$P_{\mathrm{load}}$",
+        )
+        ax_power.set_ylabel(
+            "Power load, $P_{\\mathrm{load}}$ (W)",
+            fontsize=18,
+            fontname="Arial",
+        )
+        ax_power.tick_params(
+            axis="y",
+            which="major",
+            labelsize=15,
+            direction="in",
+            right=True,
+        )
+        ax_power.set_xlim(0, float(time_s[-1]))
+        for label in ax_power.get_yticklabels():
+            label.set_fontname("Arial")
+        lines += power_line
+
+    for label in ax_heat_flux.get_xticklabels() + ax_heat_flux.get_yticklabels():
+        label.set_fontname("Arial")
+    ax_heat_flux.legend(
+        lines,
+        [line.get_label() for line in lines],
+        frameon=False,
+        fontsize=13,
+        loc="upper right",
+    )
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
 def integrate_band_power(
     frequencies: np.ndarray,
     times: np.ndarray,
@@ -1097,6 +1170,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     }
 
     dc_path = folder / "DC_power.lvm"
+    dc_time = None
+    power = None
     if dc_path.exists():
         dc = read_lvm(folder, "DC_power.lvm")
         dc = dc.rename(
@@ -1148,14 +1223,13 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         "Pressure (kPa)",
         "tab:blue",
     )
-    save_line_plot(
+    save_heat_flux_power_plot(
         plots_dir / "heat_flux_vs_time.png",
         time_s,
         heat_flux,
+        dc_time,
+        power,
         f"{test_id} Heat Flux vs Time",
-        "Time, $t$ (s)",
-        "Heat flux, $q''$ (W/cm$^2$)",
-        "tab:red",
     )
     save_temperature_profile_plot(
         plots_dir / "surface_temperature.png",
