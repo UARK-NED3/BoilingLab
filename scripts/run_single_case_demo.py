@@ -114,11 +114,14 @@ def compute_temperature_quantities(temp: pd.DataFrame) -> dict[str, np.ndarray]:
 
 def save_line_plot(path: Path, x, y, title: str, xlabel: str, ylabel: str, color: str) -> None:
     fig, ax = plt.subplots(figsize=(14, 6))
-    ax.plot(x, y, color=color, linewidth=2)
+    ax.plot(x, y, color=color, linewidth=2.2, linestyle="-")
     ax.set_title(title)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
+    ax.set_xlabel(xlabel, fontsize=18, fontname="Arial")
+    ax.set_ylabel(ylabel, fontsize=18, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
+    ax.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True, right=True)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontname("Arial")
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -1109,8 +1112,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         time_s,
         heat_flux,
         f"{test_id} Heat Flux vs Time",
-        "Time (s)",
-        "Heat Flux (W/cm^2)",
+        "Time, $t$ (s)",
+        "Heat flux, $q''$ (W/cm$^2$)",
         "tab:red",
     )
     save_line_plot(
@@ -1118,8 +1121,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         time_s,
         surface_temperature,
         f"{test_id} Surface Temperature",
-        "Time (s)",
-        "Surface Temperature (degC)",
+        "Time, $t$ (s)",
+        "Temperature, $T$ ($^\\circ$C)",
         "tab:purple",
     )
 
