@@ -127,6 +127,46 @@ def save_line_plot(path: Path, x, y, title: str, xlabel: str, ylabel: str, color
     plt.close(fig)
 
 
+def save_temperature_profile_plot(
+    path: Path,
+    time_s: np.ndarray,
+    thermocouples: np.ndarray,
+    surface_temperature: np.ndarray,
+    title: str,
+) -> None:
+    fig, ax = plt.subplots(figsize=(14, 6))
+    linewidth = 2.2
+    colors = ["tab:blue", "tab:orange", "tab:green", "tab:red"]
+    for index, color in enumerate(colors):
+        ax.plot(
+            time_s,
+            thermocouples[:, index],
+            color=color,
+            linewidth=linewidth,
+            linestyle="-",
+            label=f"TC {index + 1}",
+        )
+    ax.plot(
+        time_s,
+        surface_temperature,
+        color="tab:purple",
+        linewidth=linewidth,
+        linestyle="-",
+        label="Surface",
+    )
+    ax.set_title(title)
+    ax.set_xlabel("Time, $t$ (s)", fontsize=18, fontname="Arial")
+    ax.set_ylabel("Temperature, $T$ ($^\\circ$C)", fontsize=18, fontname="Arial")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True, right=True)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontname("Arial")
+    ax.legend(frameon=False, fontsize=13, ncol=5, loc="upper right")
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
 def integrate_band_power(
     frequencies: np.ndarray,
     times: np.ndarray,
@@ -1116,14 +1156,12 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         "Heat flux, $q''$ (W/cm$^2$)",
         "tab:red",
     )
-    save_line_plot(
+    save_temperature_profile_plot(
         plots_dir / "surface_temperature.png",
         time_s,
+        temp_data["thermocouples"],
         surface_temperature,
-        f"{test_id} Surface Temperature",
-        "Time, $t$ (s)",
-        "Temperature, $T$ ($^\\circ$C)",
-        "tab:purple",
+        f"{test_id} Temperature vs Time",
     )
 
     if not args.skip_sensors:
