@@ -110,6 +110,11 @@ peak frequency, spectral centroid, and spectral bandwidth; the companion PNGs
 plot peak frequency and spectral centroid over time for hydrophone and AE
 waveform data.
 
+For the hydrophone signal, the runner also creates a focused `300-700 s`
+double-axis overlay of band-integrated power and spectral centroid. The summary
+reports their zero-lag correlation plus a short-lag cross-correlation estimate
+to indicate whether power peaks align with centroid peaks or valleys.
+
 ## Compare Multiple Cases
 
 To compare boiling curves for the default heat-load sweep

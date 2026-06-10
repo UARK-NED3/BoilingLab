@@ -45,6 +45,8 @@ The demo additionally computes the dominant slow oscillation in the
 band-integrated hydrophone and AE traces over the default `300-700 s` window.
 It also exports characteristic frequencies over time from each spectrogram:
 peak frequency, spectral centroid, and spectral bandwidth.
+For the hydrophone data, the demo includes a double-axis `300-700 s` overlay of
+band-integrated power and spectral centroid to compare their oscillation phase.
 
 The notebook's current heat-flux marker logic searches for a maximum in a fixed
 time window and labels the result as `CHF`. Because the test log marks
@@ -103,6 +105,7 @@ Regenerated script outputs include:
 - `generated/hydrophone_band_power_oscillation_spectrum.csv`
 - `generated/plots/hydrophone_characteristic_frequencies.png`
 - `generated/hydrophone_characteristic_frequencies.csv`
+- `generated/plots/hydrophone_power_centroid_overlay.png`
 - `generated/plots/ae_wfs_band_power_oscillation_spectrum.png` when `--include-wfs` is used
 - `generated/ae_wfs_band_power_oscillation_spectrum.csv` when `--include-wfs` is used
 - `generated/plots/ae_wfs_characteristic_frequencies.png` when `--include-wfs` is used

@@ -6,6 +6,7 @@ from scripts.run_single_case_demo import (
     band_power_oscillation_spectrum,
     characteristic_frequencies,
     integrate_band_power,
+    power_centroid_alignment,
 )
 
 
@@ -87,6 +88,25 @@ class BandPowerOscillationTests(unittest.TestCase):
         self.assertEqual(n_samples, len(time))
         self.assertAlmostEqual(dominant_frequency, 0.08, places=2)
         self.assertAlmostEqual(dominant_period, 12.5, places=1)
+
+
+class PowerCentroidAlignmentTests(unittest.TestCase):
+    def test_identifies_peak_to_peak_alignment(self):
+        time = np.arange(300.0, 700.0, 0.4)
+        power = np.sin(2 * np.pi * 0.08 * time)
+        centroid = 1000.0 + 20.0 * np.sin(2 * np.pi * 0.08 * time)
+
+        result = power_centroid_alignment(
+            time,
+            power,
+            centroid,
+            window_start_s=300.0,
+            window_end_s=700.0,
+        )
+
+        self.assertGreater(result["zero_lag_correlation"], 0.95)
+        self.assertGreater(result["mean_centroid_z_at_power_peaks"], 0.0)
+        self.assertLess(result["mean_centroid_z_at_power_valleys"], 0.0)
 
 
 if __name__ == "__main__":

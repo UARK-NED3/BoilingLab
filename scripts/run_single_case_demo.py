@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pyXSteam.XSteam import XSteam
-from scipy.signal import detrend, get_window, spectrogram, welch
+from scipy.signal import correlate, correlation_lags, detrend, find_peaks, get_window, spectrogram, welch
 import matplotlib.ticker as mticker
 
 
@@ -240,6 +240,158 @@ def save_characteristic_frequency_analysis(
         f"{prefix}_median_peak_frequency_Hz": float(np.nanmedian(peak_frequency)),
         f"{prefix}_median_spectral_centroid_Hz": float(np.nanmedian(centroid_frequency)),
         f"{prefix}_median_spectral_bandwidth_Hz": float(np.nanmedian(bandwidth)),
+    }
+
+
+def power_centroid_alignment(
+    time_s: np.ndarray,
+    power_db: np.ndarray,
+    centroid_hz: np.ndarray,
+    window_start_s: float,
+    window_end_s: float,
+    max_lag_s: float = 30.0,
+) -> dict[str, float | int]:
+    mask = (
+        (time_s >= window_start_s)
+        & (time_s <= window_end_s)
+        & np.isfinite(time_s)
+        & np.isfinite(power_db)
+        & np.isfinite(centroid_hz)
+    )
+    selected_time = time_s[mask]
+    selected_power = power_db[mask]
+    selected_centroid = centroid_hz[mask]
+    if len(selected_time) < 8:
+        raise ValueError(
+            f"Need at least 8 samples between {window_start_s:g} and {window_end_s:g} s "
+            "for power-centroid alignment analysis."
+        )
+
+    sample_spacing_s = float(np.median(np.diff(selected_time)))
+    power_signal = detrend(selected_power - np.nanmean(selected_power), type="linear")
+    centroid_signal = detrend(selected_centroid - np.nanmean(selected_centroid), type="linear")
+    power_std = float(np.nanstd(power_signal))
+    centroid_std = float(np.nanstd(centroid_signal))
+    if power_std == 0 or centroid_std == 0:
+        raise ValueError("Power and centroid signals must vary for alignment analysis.")
+
+    power_z = (power_signal - np.nanmean(power_signal)) / power_std
+    centroid_z = (centroid_signal - np.nanmean(centroid_signal)) / centroid_std
+    zero_lag_correlation = float(np.nanmean(power_z * centroid_z))
+
+    cross_correlation = correlate(centroid_z, power_z, mode="full") / len(power_z)
+    lags_s = correlation_lags(len(centroid_z), len(power_z), mode="full") * sample_spacing_s
+    lag_mask = np.abs(lags_s) <= max_lag_s
+    best_index = int(np.nanargmax(np.abs(cross_correlation[lag_mask])))
+    best_lag_s = float(lags_s[lag_mask][best_index])
+    best_correlation = float(cross_correlation[lag_mask][best_index])
+
+    min_peak_spacing_samples = max(1, int(round(8.0 / sample_spacing_s)))
+    power_peak_indices, _ = find_peaks(
+        power_z,
+        distance=min_peak_spacing_samples,
+        prominence=0.5,
+    )
+    power_valley_indices, _ = find_peaks(
+        -power_z,
+        distance=min_peak_spacing_samples,
+        prominence=0.5,
+    )
+
+    return {
+        "samples": int(len(selected_time)),
+        "zero_lag_correlation": zero_lag_correlation,
+        "best_correlation": best_correlation,
+        "best_lag_s": best_lag_s,
+        "mean_centroid_z_at_power_peaks": float(np.nanmean(centroid_z[power_peak_indices]))
+        if len(power_peak_indices)
+        else float("nan"),
+        "mean_centroid_z_at_power_valleys": float(np.nanmean(centroid_z[power_valley_indices]))
+        if len(power_valley_indices)
+        else float("nan"),
+        "power_peak_count": int(len(power_peak_indices)),
+        "power_valley_count": int(len(power_valley_indices)),
+    }
+
+
+def save_power_centroid_overlay(
+    prefix: str,
+    time_s: np.ndarray,
+    power_db: np.ndarray,
+    centroid_hz: np.ndarray,
+    plots_dir: Path,
+    window_start_s: float,
+    window_end_s: float,
+) -> dict[str, object]:
+    mask = (
+        (time_s >= window_start_s)
+        & (time_s <= window_end_s)
+        & np.isfinite(power_db)
+        & np.isfinite(centroid_hz)
+    )
+    selected_time = time_s[mask]
+    selected_power_db = power_db[mask]
+    selected_centroid_khz = centroid_hz[mask] / 1e3
+    if len(selected_time) < 2:
+        raise ValueError("Need at least 2 samples for power-centroid overlay plot.")
+
+    fig, ax_power = plt.subplots(figsize=(12, 6))
+    ax_centroid = ax_power.twinx()
+    power_line = ax_power.plot(
+        selected_time,
+        selected_power_db,
+        color="tab:blue",
+        linewidth=1.6,
+        label="Band-integrated power",
+    )
+    centroid_line = ax_centroid.plot(
+        selected_time,
+        selected_centroid_khz,
+        color="black",
+        linewidth=1.8,
+        label="Spectral centroid",
+    )
+    ax_power.set_xlim(window_start_s, window_end_s)
+    ax_power.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
+    ax_power.set_ylabel("Band-integrated power (dB re V$^2$)", fontsize=18, fontname="Arial")
+    ax_centroid.set_ylabel("Spectral centroid, $f_c$ (kHz)", fontsize=18, fontname="Arial")
+    ax_power.grid(True, linestyle="--", alpha=0.35)
+    ax_power.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True)
+    ax_centroid.tick_params(axis="y", which="major", labelsize=15, direction="in", right=True)
+    for label in (
+        ax_power.get_xticklabels()
+        + ax_power.get_yticklabels()
+        + ax_centroid.get_yticklabels()
+    ):
+        label.set_fontname("Arial")
+    lines = power_line + centroid_line
+    ax_power.legend(lines, [line.get_label() for line in lines], frameon=False, fontsize=14)
+    fig.subplots_adjust(left=0.14, bottom=0.17, right=0.86, top=0.96)
+    fig.savefig(plots_dir / f"{prefix}_power_centroid_overlay.png", dpi=180)
+    plt.close(fig)
+
+    alignment = power_centroid_alignment(
+        time_s,
+        power_db,
+        centroid_hz,
+        window_start_s=window_start_s,
+        window_end_s=window_end_s,
+    )
+    return {
+        f"{prefix}_power_centroid_window_start_s": float(window_start_s),
+        f"{prefix}_power_centroid_window_end_s": float(window_end_s),
+        f"{prefix}_power_centroid_samples": alignment["samples"],
+        f"{prefix}_power_centroid_zero_lag_correlation": alignment["zero_lag_correlation"],
+        f"{prefix}_power_centroid_best_correlation": alignment["best_correlation"],
+        f"{prefix}_power_centroid_best_lag_s": alignment["best_lag_s"],
+        f"{prefix}_mean_centroid_z_at_power_peaks": alignment[
+            "mean_centroid_z_at_power_peaks"
+        ],
+        f"{prefix}_mean_centroid_z_at_power_valleys": alignment[
+            "mean_centroid_z_at_power_valleys"
+        ],
+        f"{prefix}_power_peak_count": alignment["power_peak_count"],
+        f"{prefix}_power_valley_count": alignment["power_valley_count"],
     }
 
 
@@ -476,6 +628,23 @@ def save_hydrophone_analysis(
             band_min_hz=band_min_hz,
             band_max_hz=band_max_hz,
             color="tab:blue",
+        )
+    )
+    _, hydrophone_centroid_frequency, _ = characteristic_frequencies(
+        psd_frequencies,
+        psd,
+        band_min_hz=band_min_hz,
+        band_max_hz=band_max_hz,
+    )
+    summary.update(
+        save_power_centroid_overlay(
+            "hydrophone",
+            psd_times,
+            band_integrated_power_db,
+            hydrophone_centroid_frequency,
+            plots_dir,
+            window_start_s=oscillation_start_s,
+            window_end_s=oscillation_end_s,
         )
     )
     summary.update(
