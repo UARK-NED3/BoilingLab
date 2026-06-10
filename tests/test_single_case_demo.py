@@ -3,9 +3,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from scripts.run_single_case_demo import (
+    add_event_markers,
     band_power_oscillation_spectrum,
     characteristic_frequencies,
     detect_dnb_time,
@@ -147,6 +149,19 @@ class PowerCentroidAlignmentTests(unittest.TestCase):
 
 
 class AcousticEventMarkerPlotTests(unittest.TestCase):
+    def test_peak_event_label_is_on_right_side_of_marker(self):
+        fig, ax = plt.subplots()
+        try:
+            ax.plot([0.0, 1.0], [0.0, 1.0])
+
+            add_event_markers(ax, peak_time_s=0.5)
+
+            peak_labels = [text for text in ax.texts if "peak" in text.get_text()]
+            self.assertEqual(len(peak_labels), 1)
+            self.assertEqual(peak_labels[0].get_ha(), "left")
+        finally:
+            plt.close(fig)
+
     def test_characteristic_frequency_plot_adds_event_markers(self):
         times = np.linspace(0.0, 4.0, 5)
         frequencies = np.array([0.0, 1000.0, 2000.0])

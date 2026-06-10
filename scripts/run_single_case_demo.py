@@ -225,7 +225,7 @@ def add_event_markers(
             r"$t_{\mathrm{peak}}$",
             rotation=90,
             va="bottom",
-            ha="right",
+            ha="left",
             fontsize=13,
             fontname="Arial",
             color="tab:red",
