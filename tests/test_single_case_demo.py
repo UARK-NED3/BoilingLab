@@ -9,6 +9,7 @@ from scripts.run_single_case_demo import (
     band_power_oscillation_spectrum,
     characteristic_frequencies,
     detect_dnb_time,
+    detect_wall_temperature_peak_time,
     integrate_band_power,
     power_centroid_alignment,
     save_characteristic_frequency_analysis,
@@ -92,6 +93,21 @@ class DnbDetectionTests(unittest.TestCase):
         self.assertEqual(drop_start_index, 5)
         self.assertEqual(dnb_index, 4)
 
+    def test_extracts_wall_temperature_peak_time(self):
+        time = np.arange(0.0, 12.0, 1.0)
+        wall_temperature = np.array(
+            [80.0, 90.0, 110.0, 130.0, 160.0, 155.0, 140.0, 145.0, 150.0, 149.0, 148.0, 147.0]
+        )
+
+        peak_index = detect_wall_temperature_peak_time(
+            time,
+            wall_temperature,
+            search_start_s=0.0,
+            search_end_s=8.0,
+        )
+
+        self.assertEqual(peak_index, 4)
+
 
 class BandPowerOscillationTests(unittest.TestCase):
     def test_detects_dominant_low_frequency_modulation(self):
@@ -156,11 +172,13 @@ class AcousticEventMarkerPlotTests(unittest.TestCase):
                     band_max_hz=2000.0,
                     color="tab:blue",
                     dnb_time_s=1.0,
+                    peak_time_s=2.0,
                     off_time_s=3.0,
                 )
 
         self.assertEqual(markers.call_count, 1)
         self.assertEqual(markers.call_args.kwargs["dnb_time_s"], 1.0)
+        self.assertEqual(markers.call_args.kwargs["peak_time_s"], 2.0)
         self.assertEqual(markers.call_args.kwargs["off_time_s"], 3.0)
 
 

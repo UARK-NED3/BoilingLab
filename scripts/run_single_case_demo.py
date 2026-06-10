@@ -81,33 +81,66 @@ def detect_dnb_time(
     search_end_s: float,
     drop_window_s: float = 5.0,
 ) -> tuple[int, int]:
+    return detect_heat_flux_drop_peak_time(
+        time_s,
+        heat_flux,
+        search_start_s=0.0,
+        search_end_s=search_end_s,
+        drop_window_s=drop_window_s,
+    )
+
+
+def detect_heat_flux_drop_peak_time(
+    time_s: np.ndarray,
+    heat_flux: np.ndarray,
+    search_start_s: float,
+    search_end_s: float,
+    drop_window_s: float = 5.0,
+) -> tuple[int, int]:
     finite = np.isfinite(time_s) & np.isfinite(heat_flux)
     if np.sum(finite) < 3:
-        raise ValueError("Need at least three finite heat-flux samples for DNB detection.")
+        raise ValueError("Need at least three finite heat-flux samples for drop detection.")
 
     sample_spacing_s = float(np.nanmedian(np.diff(time_s[finite])))
     drop_points = max(1, int(round(drop_window_s / sample_spacing_s)))
     if len(time_s) <= drop_points:
-        raise ValueError("DNB drop window is longer than the heat-flux series.")
+        raise ValueError("Drop detection window is longer than the heat-flux series.")
 
     delta_q = heat_flux[drop_points:] - heat_flux[:-drop_points]
     drop_start_time = time_s[:-drop_points]
     drop_candidates = np.where(
         finite[:-drop_points]
         & finite[drop_points:]
-        & (drop_start_time >= 0)
+        & (drop_start_time >= search_start_s)
         & (drop_start_time <= search_end_s)
     )[0]
     if drop_candidates.size == 0:
-        raise ValueError("No heat-flux samples found inside the DNB search window.")
+        raise ValueError("No heat-flux samples found inside the drop search window.")
 
     drop_start_idx = int(drop_candidates[np.nanargmin(delta_q[drop_candidates])])
-    pre_drop_candidates = np.where(finite & (time_s >= 0) & (time_s <= time_s[drop_start_idx]))[0]
+    pre_drop_candidates = np.where(
+        finite & (time_s >= search_start_s) & (time_s <= time_s[drop_start_idx])
+    )[0]
     if pre_drop_candidates.size == 0:
-        raise ValueError("No heat-flux samples found before the DNB drop.")
+        raise ValueError("No heat-flux samples found before the sudden heat-flux drop.")
 
-    dnb_idx = first_max_index(heat_flux, pre_drop_candidates, time_s)
-    return dnb_idx, drop_start_idx
+    peak_idx = first_max_index(heat_flux, pre_drop_candidates, time_s)
+    return peak_idx, drop_start_idx
+
+
+def detect_wall_temperature_peak_time(
+    time_s: np.ndarray,
+    surface_temperature: np.ndarray,
+    search_start_s: float,
+    search_end_s: float,
+) -> int:
+    finite = np.isfinite(time_s) & np.isfinite(surface_temperature)
+    candidates = np.where(
+        finite & (time_s >= search_start_s) & (time_s <= search_end_s)
+    )[0]
+    if candidates.size == 0:
+        raise ValueError("No wall-temperature samples found inside the peak search window.")
+    return first_max_index(surface_temperature, candidates, time_s)
 
 
 def compute_temperature_quantities(temp: pd.DataFrame) -> dict[str, np.ndarray]:
@@ -165,15 +198,17 @@ def save_line_plot(path: Path, x, y, title: str, xlabel: str, ylabel: str, color
 def add_event_markers(
     ax: plt.Axes,
     dnb_time_s: float | None = None,
+    peak_time_s: float | None = None,
     off_time_s: float | None = None,
 ) -> None:
     ymin, ymax = ax.get_ylim()
-    label_y = ymin + 0.06 * (ymax - ymin)
+    lower_label_y = ymin + 0.06 * (ymax - ymin)
+    peak_label_y = ymin + 0.18 * (ymax - ymin)
     if dnb_time_s is not None:
         ax.axvline(dnb_time_s, color="black", linestyle="--", linewidth=1.3)
         ax.text(
             dnb_time_s,
-            label_y,
+            lower_label_y,
             r"$t_{\mathrm{DNB}}$",
             rotation=90,
             va="bottom",
@@ -182,11 +217,24 @@ def add_event_markers(
             fontname="Arial",
             color="black",
         )
+    if peak_time_s is not None:
+        ax.axvline(peak_time_s, color="tab:red", linestyle=":", linewidth=1.5)
+        ax.text(
+            peak_time_s,
+            peak_label_y,
+            r"$t_{\mathrm{peak}}$",
+            rotation=90,
+            va="bottom",
+            ha="right",
+            fontsize=13,
+            fontname="Arial",
+            color="tab:red",
+        )
     if off_time_s is not None:
         ax.axvline(off_time_s, color="0.35", linestyle="--", linewidth=1.3)
         ax.text(
             off_time_s,
-            label_y,
+            lower_label_y,
             r"$t_{\mathrm{off}}$",
             rotation=90,
             va="bottom",
@@ -204,6 +252,7 @@ def save_temperature_profile_plot(
     surface_temperature: np.ndarray,
     title: str,
     dnb_time_s: float | None = None,
+    peak_time_s: float | None = None,
     off_time_s: float | None = None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(14, 6))
@@ -231,7 +280,7 @@ def save_temperature_profile_plot(
     ax.set_xlabel("Time, $t$ (s)", fontsize=18, fontname="Arial")
     ax.set_ylabel("Temperature, $T$ ($^\\circ$C)", fontsize=18, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
-    add_event_markers(ax, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
+    add_event_markers(ax, dnb_time_s=dnb_time_s, peak_time_s=peak_time_s, off_time_s=off_time_s)
     ax.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True, right=True)
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontname("Arial")
@@ -249,6 +298,7 @@ def save_heat_flux_power_plot(
     power_w: np.ndarray | None,
     title: str,
     dnb_time_s: float | None = None,
+    peak_time_s: float | None = None,
     off_time_s: float | None = None,
 ) -> None:
     fig, ax_heat_flux = plt.subplots(figsize=(14, 6))
@@ -266,7 +316,12 @@ def save_heat_flux_power_plot(
     ax_heat_flux.set_xlabel("Time, $t$ (s)", fontsize=18, fontname="Arial")
     ax_heat_flux.set_ylabel("Heat flux, $q''$ (W/cm$^2$)", fontsize=18, fontname="Arial")
     ax_heat_flux.grid(True, linestyle="--", alpha=0.4)
-    add_event_markers(ax_heat_flux, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
+    add_event_markers(
+        ax_heat_flux,
+        dnb_time_s=dnb_time_s,
+        peak_time_s=peak_time_s,
+        off_time_s=off_time_s,
+    )
     ax_heat_flux.tick_params(
         axis="both",
         which="major",
@@ -389,6 +444,7 @@ def save_characteristic_frequency_analysis(
     band_max_hz: float,
     color: str,
     dnb_time_s: float | None = None,
+    peak_time_s: float | None = None,
     off_time_s: float | None = None,
 ) -> dict[str, object]:
     peak_frequency, centroid_frequency, bandwidth = characteristic_frequencies(
@@ -421,7 +477,7 @@ def save_characteristic_frequency_analysis(
     ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
     ax.set_ylabel("Frequency, $f$ (kHz)", fontsize=20, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
-    add_event_markers(ax, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
+    add_event_markers(ax, dnb_time_s=dnb_time_s, peak_time_s=peak_time_s, off_time_s=off_time_s)
     ax.legend(frameon=False, fontsize=15)
     ax.tick_params(axis="both", which="major", labelsize=16, direction="in", top=True, right=True)
     for label in ax.get_xticklabels() + ax.get_yticklabels():
@@ -519,6 +575,7 @@ def save_power_centroid_overlay(
     window_start_s: float,
     window_end_s: float,
     dnb_time_s: float | None = None,
+    peak_time_s: float | None = None,
     off_time_s: float | None = None,
 ) -> dict[str, object]:
     mask = (
@@ -554,7 +611,12 @@ def save_power_centroid_overlay(
     ax_power.set_ylabel("Band-integrated power (dB re V$^2$)", fontsize=18, fontname="Arial")
     ax_centroid.set_ylabel("Spectral centroid, $f_c$ (kHz)", fontsize=18, fontname="Arial")
     ax_power.grid(True, linestyle="--", alpha=0.35)
-    add_event_markers(ax_power, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
+    add_event_markers(
+        ax_power,
+        dnb_time_s=dnb_time_s,
+        peak_time_s=peak_time_s,
+        off_time_s=off_time_s,
+    )
     ax_power.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True)
     ax_centroid.tick_params(axis="y", which="major", labelsize=15, direction="in", right=True)
     for label in (
@@ -707,6 +769,7 @@ def save_hydrophone_analysis(
     oscillation_end_s: float,
     oscillation_max_frequency_hz: float,
     dnb_time_s: float | None = None,
+    peak_time_s: float | None = None,
     off_time_s: float | None = None,
 ) -> dict[str, object]:
     path = folder / "Hydrophones.lvm"
@@ -767,7 +830,7 @@ def save_hydrophone_analysis(
     ax.set_ylabel("Frequency, $f$ (kHz)", fontsize=24, fontname="Arial")
     ax.set_xlabel("Time, $t$ (s)", fontsize=24, fontname="Arial")
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:.1f}"))
-    add_event_markers(ax, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
+    add_event_markers(ax, dnb_time_s=dnb_time_s, peak_time_s=peak_time_s, off_time_s=off_time_s)
     colorbar = fig.colorbar(spectrogram_image, ax=ax, fraction=0.035, pad=0.03)
     colorbar.set_label("Power (dB)", fontsize=22, fontname="Arial")
     colorbar.ax.tick_params(labelsize=18)
@@ -807,7 +870,7 @@ def save_hydrophone_analysis(
     ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
     ax.set_ylabel("Band-integrated power (dB re V²)", fontsize=20, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
-    add_event_markers(ax, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
+    add_event_markers(ax, dnb_time_s=dnb_time_s, peak_time_s=peak_time_s, off_time_s=off_time_s)
     ax.tick_params(axis="both", which="major", labelsize=16, direction="in", top=True, right=True)
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontname("Arial")
@@ -838,6 +901,7 @@ def save_hydrophone_analysis(
             band_max_hz=band_max_hz,
             color="tab:blue",
             dnb_time_s=dnb_time_s,
+            peak_time_s=peak_time_s,
             off_time_s=off_time_s,
         )
     )
@@ -857,6 +921,7 @@ def save_hydrophone_analysis(
             window_start_s=oscillation_start_s,
             window_end_s=oscillation_end_s,
             dnb_time_s=dnb_time_s,
+            peak_time_s=peak_time_s,
             off_time_s=off_time_s,
         )
     )
@@ -1050,6 +1115,9 @@ def save_wfs_ae_spectrogram(
     oscillation_max_frequency_hz: float,
     vmin_db: float,
     vmax_db: float,
+    dnb_time_s: float | None = None,
+    peak_time_s: float | None = None,
+    off_time_s: float | None = None,
 ) -> dict[str, object]:
     wfs_path = find_wfs_file(folder)
     if wfs_path is None:
@@ -1126,6 +1194,7 @@ def save_wfs_ae_spectrogram(
     ax.set_ylabel("Frequency, $f$ (kHz)", fontsize=24, fontname="Arial")
     ax.set_xlabel("Time, $t$ (s)", fontsize=24, fontname="Arial")
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda value, _: f"{value:.1f}"))
+    add_event_markers(ax, dnb_time_s=dnb_time_s, peak_time_s=peak_time_s, off_time_s=off_time_s)
     ax.tick_params(axis="both", which="major", labelsize=20)
     colorbar = fig.colorbar(image, ax=ax, fraction=0.035, pad=0.03)
     colorbar.set_label("Power (dB)", fontsize=22, fontname="Arial")
@@ -1141,6 +1210,7 @@ def save_wfs_ae_spectrogram(
     ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
     ax.set_ylabel("Band-integrated power (dB re V$^2$)", fontsize=20, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
+    add_event_markers(ax, dnb_time_s=dnb_time_s, peak_time_s=peak_time_s, off_time_s=off_time_s)
     ax.tick_params(axis="both", which="major", labelsize=16, direction="in", top=True, right=True)
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontname("Arial")
@@ -1179,6 +1249,9 @@ def save_wfs_ae_spectrogram(
             band_min_hz=band_min_hz,
             band_max_hz=band_max_hz,
             color="tab:green",
+            dnb_time_s=dnb_time_s,
+            peak_time_s=peak_time_s,
+            off_time_s=off_time_s,
         )
     )
     summary.update(
@@ -1235,6 +1308,14 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         search_end_s=args.dnb_search_end_s,
         drop_window_s=args.dnb_drop_window_s,
     )
+    peak_idx = detect_wall_temperature_peak_time(
+        time_s,
+        surface_temperature,
+        search_start_s=0.0,
+        search_end_s=args.dnb_search_end_s,
+    )
+    dnb_time_s = float(time_s[dnb_idx])
+    peak_time_s = float(time_s[peak_idx])
     q_min_idx = int(np.nanargmin(heat_flux[chf_idx : nbr_idx + 1]) + chf_idx)
 
     summary: dict[str, object] = {
@@ -1253,11 +1334,15 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         "time_at_max_surface_temp_s": float(time_s[np.nanargmax(surface_temperature)]),
         "max_heat_flux_W_cm2": float(np.nanmax(heat_flux)),
         "time_at_max_heat_flux_s": float(time_s[np.nanargmax(heat_flux)]),
-        "dnb_time_s": float(time_s[dnb_idx]),
+        "dnb_time_s": dnb_time_s,
         "dnb_heat_flux_W_cm2": float(heat_flux[dnb_idx]),
         "dnb_drop_start_time_s": float(time_s[dnb_drop_start_idx]),
         "dnb_search_end_s": float(args.dnb_search_end_s),
         "dnb_drop_window_s": float(args.dnb_drop_window_s),
+        "peak_time_s": peak_time_s,
+        "peak_surface_temp_C": float(surface_temperature[peak_idx]),
+        "peak_heat_flux_W_cm2": float(heat_flux[peak_idx]),
+        "peak_search_end_s": float(args.dnb_search_end_s),
         "chf_proxy_time_s": float(time_s[chf_idx]),
         "chf_proxy_W_cm2": float(heat_flux[chf_idx]),
         "htc_at_chf_proxy_W_cm2K": float(htc[chf_idx]),
@@ -1332,7 +1417,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         dc_time,
         power,
         f"{test_id} Heat Flux vs Time",
-        dnb_time_s=float(time_s[dnb_idx]),
+        dnb_time_s=dnb_time_s,
+        peak_time_s=peak_time_s,
         off_time_s=shut_time,
     )
     save_temperature_profile_plot(
@@ -1341,7 +1427,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         temp_data["thermocouples"],
         surface_temperature,
         f"{test_id} Temperature vs Time",
-        dnb_time_s=float(time_s[dnb_idx]),
+        dnb_time_s=dnb_time_s,
+        peak_time_s=peak_time_s,
         off_time_s=shut_time,
     )
 
@@ -1355,7 +1442,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
                 oscillation_start_s=args.oscillation_start_s,
                 oscillation_end_s=args.oscillation_end_s,
                 oscillation_max_frequency_hz=args.oscillation_max_frequency_hz,
-                dnb_time_s=float(time_s[dnb_idx]),
+                dnb_time_s=dnb_time_s,
+                peak_time_s=peak_time_s,
                 off_time_s=shut_time,
             )
         )
@@ -1374,6 +1462,9 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
                     oscillation_max_frequency_hz=args.oscillation_max_frequency_hz,
                     vmin_db=args.wfs_vmin_db,
                     vmax_db=args.wfs_vmax_db,
+                    dnb_time_s=dnb_time_s,
+                    peak_time_s=peak_time_s,
+                    off_time_s=shut_time,
                 )
             )
 
