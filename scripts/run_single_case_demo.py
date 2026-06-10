@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pyXSteam.XSteam import XSteam
-from scipy.signal import spectrogram
+from scipy.signal import get_window, spectrogram
 import matplotlib.ticker as mticker
 
 
@@ -366,6 +366,142 @@ def save_ae_analysis(folder: Path, plots_dir: Path) -> dict[str, object]:
     return summary
 
 
+def find_wfs_file(folder: Path) -> Path | None:
+    candidates = sorted(folder.glob("*.wfs")) + sorted(folder.glob("*.WFS"))
+    return candidates[0] if candidates else None
+
+
+def sparse_windowed_spectrogram(
+    raw_signal: np.ndarray,
+    sampling_frequency: float,
+    nperseg: int,
+    n_time_bins: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int, int]:
+    """Compute a display-oriented spectrogram from very large continuous AE streams."""
+    raw_signal = np.asarray(raw_signal, dtype=np.float32)
+    n_samples = len(raw_signal)
+    if n_samples == 0:
+        raise ValueError("AE waveform signal is empty.")
+
+    chunk_size = max(1, n_samples // max(1, n_time_bins))
+    nperseg = max(8, min(int(nperseg), chunk_size))
+    if nperseg % 2:
+        nperseg -= 1
+    if nperseg < 8:
+        nperseg = min(chunk_size, 8)
+
+    window = get_window("hann", nperseg)
+    window_norm = float((window**2).sum() * sampling_frequency)
+
+    n_bins_actual = max(1, (n_samples - nperseg) // chunk_size + 1)
+    stride = raw_signal.strides[0]
+    segments = np.lib.stride_tricks.as_strided(
+        raw_signal,
+        shape=(n_bins_actual, nperseg),
+        strides=(chunk_size * stride, stride),
+        writeable=False,
+    )
+
+    windowed = segments * window[np.newaxis, :]
+    ffts = np.fft.rfft(windowed, axis=1)
+    sxx = (np.abs(ffts) ** 2 / window_norm).T
+    frequencies = np.fft.rfftfreq(nperseg, d=1.0 / sampling_frequency)
+    times = (np.arange(n_bins_actual) * chunk_size + nperseg / 2) / sampling_frequency
+    return frequencies, times, sxx, chunk_size, nperseg
+
+
+def save_wfs_ae_spectrogram(
+    folder: Path,
+    plots_dir: Path,
+    channel: int,
+    max_freq_hz: float,
+    vmin_db: float,
+    vmax_db: float,
+) -> dict[str, object]:
+    wfs_path = find_wfs_file(folder)
+    if wfs_path is None:
+        return {"ae_wfs_available": False}
+
+    try:
+        from decode_wfs import decode_wfs, load_continuous
+    except ImportError as exc:
+        raise ImportError(
+            "AE waveform spectrograms require the 'decode-wfs' package. "
+            "Install repo dependencies with `python -m pip install -r requirements.txt`."
+        ) from exc
+
+    raw, time_s, sampling_rate = load_continuous(wfs_path, channel=channel)
+    raw = np.asarray(raw)
+    time_s = np.asarray(time_s)
+    sampling_rate = float(sampling_rate)
+
+    first_record = decode_wfs(wfs_path, max_records=1).waveforms[0]
+    samples_per_record = len(first_record.samples)
+
+    fig_dpi = 150
+    fig_width = 16
+    fig_height = 7
+    px_wide = int(fig_width * fig_dpi)
+    px_tall = int(fig_height * fig_dpi)
+    nperseg = max(8, samples_per_record * 2)
+
+    frequencies, times, sxx, chunk_size, nperseg_used = sparse_windowed_spectrogram(
+        raw,
+        sampling_frequency=sampling_rate,
+        nperseg=nperseg,
+        n_time_bins=px_wide,
+    )
+    sxx_db = 10 * np.log10(np.maximum(sxx, np.finfo(float).tiny))
+
+    freq_mask = frequencies <= max_freq_hz
+    if not np.any(freq_mask):
+        raise ValueError(f"No AE waveform frequency bins found below {max_freq_hz:g} Hz.")
+    plot_frequencies = frequencies[freq_mask]
+    plot_sxx_db = sxx_db[freq_mask, :]
+
+    freq_step = max(1, plot_sxx_db.shape[0] // px_tall)
+    plot_sxx_db = plot_sxx_db[::freq_step, :]
+    plot_frequencies = plot_frequencies[::freq_step]
+
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=fig_dpi, constrained_layout=True)
+    image = ax.imshow(
+        plot_sxx_db,
+        extent=[times[0], times[-1], plot_frequencies[-1] / 1e3, plot_frequencies[0] / 1e3],
+        interpolation="bilinear",
+        cmap="viridis",
+        aspect="auto",
+        vmin=vmin_db,
+        vmax=vmax_db,
+    )
+    ax.invert_yaxis()
+    ax.set_ylabel("Frequency, $f$ (kHz)", fontsize=24, fontname="Arial")
+    ax.set_xlabel("Time, $t$ (s)", fontsize=24, fontname="Arial")
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda value, _: f"{value:.1f}"))
+    ax.tick_params(axis="both", which="major", labelsize=20)
+    colorbar = fig.colorbar(image, ax=ax, fraction=0.035, pad=0.03)
+    colorbar.set_label("Power (dB)", fontsize=22, fontname="Arial")
+    colorbar.ax.tick_params(labelsize=18)
+    for label in ax.get_xticklabels() + ax.get_yticklabels() + colorbar.ax.get_yticklabels():
+        label.set_fontname("Arial")
+    fig.savefig(plots_dir / "ae_wfs_spectrogram.png", dpi=180)
+    plt.close(fig)
+
+    return {
+        "ae_wfs_available": True,
+        "ae_wfs_file": str(wfs_path),
+        "ae_wfs_channel": int(channel),
+        "ae_wfs_samples": int(len(raw)),
+        "ae_wfs_duration_s": float(time_s[-1] - time_s[0]) if len(time_s) else None,
+        "ae_wfs_sampling_frequency_Hz": sampling_rate,
+        "ae_wfs_samples_per_record": int(samples_per_record),
+        "ae_wfs_spectrogram_time_bins": int(len(times)),
+        "ae_wfs_spectrogram_frequency_bins": int(len(plot_frequencies)),
+        "ae_wfs_spectrogram_chunk_size": int(chunk_size),
+        "ae_wfs_spectrogram_nperseg": int(nperseg_used),
+        "ae_wfs_spectrogram_max_frequency_Hz": float(max_freq_hz),
+    }
+
+
 def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     test_id = args.test_id if args.test_id.startswith("Boiling-") else f"Boiling-{args.test_id}"
     folder = Path(args.raw_root) / test_id
@@ -509,6 +645,17 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
             )
         )
         summary.update(save_ae_analysis(folder, plots_dir))
+        if args.include_wfs:
+            summary.update(
+                save_wfs_ae_spectrogram(
+                    folder,
+                    plots_dir,
+                    channel=args.wfs_channel,
+                    max_freq_hz=args.wfs_max_freq_hz,
+                    vmin_db=args.wfs_vmin_db,
+                    vmax_db=args.wfs_vmax_db,
+                )
+            )
 
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     write_summary_markdown(output_dir / "summary.md", summary)
@@ -556,6 +703,35 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-sensors",
         action="store_true",
         help="Skip hydrophone and acoustic-emission analysis plots.",
+    )
+    parser.add_argument(
+        "--include-wfs",
+        action="store_true",
+        help="Decode any .wfs waveform file and save an AE waveform spectrogram.",
+    )
+    parser.add_argument(
+        "--wfs-channel",
+        type=int,
+        default=1,
+        help="Waveform channel to decode from the .wfs file.",
+    )
+    parser.add_argument(
+        "--wfs-max-freq-hz",
+        type=float,
+        default=250000.0,
+        help="Upper frequency limit for the AE waveform spectrogram.",
+    )
+    parser.add_argument(
+        "--wfs-vmin-db",
+        type=float,
+        default=-180.0,
+        help="Lower color scale limit for the AE waveform spectrogram.",
+    )
+    parser.add_argument(
+        "--wfs-vmax-db",
+        type=float,
+        default=-40.0,
+        help="Upper color scale limit for the AE waveform spectrogram.",
     )
     return parser
 

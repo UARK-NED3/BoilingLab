@@ -9,3 +9,4 @@ ipykernel
 nbformat
 nbclient
 imageio-ffmpeg
+decode-wfs

@@ -31,6 +31,16 @@ present. The hydrophone scalar plot uses the PSD integrated over frequency,
 reported as a band-limited voltage-squared acoustic-power proxy. Use
 `--skip-sensors` for a faster thermal-only run.
 
+To reproduce the continuous AE waveform spectrogram from the `.wfs` stream,
+run the same demo with:
+
+```powershell
+python scripts\run_single_case_demo.py --include-wfs
+```
+
+The `.wfs` path is detected from the raw Boiling-417 folder and decoded with
+`decode-wfs`; channel 1 is used unless `--wfs-channel` is supplied.
+
 The notebook's current heat-flux marker logic searches for a maximum in a fixed
 time window and labels the result as `CHF`. Because the test log marks
 `Boiling-417` as `Failure: CHF not reached`, the `CHF` value reported below
@@ -81,3 +91,4 @@ Regenerated script outputs include:
 - `generated/plots/hydrophone_band_integrated_power.png`
 - `generated/plots/ae_hit_parameters.png`
 - `generated/plots/ae_time_parameters.png`
+- `generated/plots/ae_wfs_spectrogram.png` when `--include-wfs` is used

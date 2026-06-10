@@ -40,5 +40,17 @@
   "ae_hit_available": true,
   "ae_time_available": true,
   "ae_hit_rows": 61864,
-  "ae_time_rows": 100841
+  "ae_time_rows": 100841,
+  "ae_wfs_available": true,
+  "ae_wfs_file": "Y:\\0_Ishraq\\New Pool Boiling Video\\Boiling-417\\STREAM20260510-180215-533.wfs",
+  "ae_wfs_channel": 1,
+  "ae_wfs_samples": 1007625216,
+  "ae_wfs_duration_s": 1007.625215,
+  "ae_wfs_sampling_frequency_Hz": 1000000.0,
+  "ae_wfs_samples_per_record": 4096,
+  "ae_wfs_spectrogram_time_bins": 2400,
+  "ae_wfs_spectrogram_frequency_bins": 2049,
+  "ae_wfs_spectrogram_chunk_size": 419843,
+  "ae_wfs_spectrogram_nperseg": 8192,
+  "ae_wfs_spectrogram_max_frequency_Hz": 250000.0
 }

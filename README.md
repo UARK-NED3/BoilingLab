@@ -72,6 +72,18 @@ band-integrated PSD scalar over time by integrating the PSD over frequency; this
 is a voltage-squared acoustic-power proxy unless the hydrophone signal is
 calibrated to pressure.
 
+To include the continuous acoustic-emission waveform spectrogram from a `.wfs`
+stream file, install the full requirements and run:
+
+```powershell
+python scripts\run_single_case_demo.py --include-wfs
+```
+
+This decodes the waveform with `decode-wfs`, uses channel 1 by default, and
+writes `generated\plots\ae_wfs_spectrogram.png`. Use `--wfs-channel` to select
+a different waveform channel and `--wfs-max-freq-hz` to change the plotted
+frequency range.
+
 For a faster thermal-only run:
 
 ```powershell
