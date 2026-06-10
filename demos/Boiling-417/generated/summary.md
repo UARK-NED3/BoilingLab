@@ -42,6 +42,11 @@ Notebook marker values are reproduced for comparison. If the test log says CHF w
 | `hydrophone_band_power_min_V2` | `2.662287225914444e-07` |
 | `hydrophone_band_power_max_V2` | `0.3443237708393874` |
 | `hydrophone_band_power_mean_V2` | `0.015699904145764908` |
+| `hydrophone_characteristic_band_min_Hz` | `0.0` |
+| `hydrophone_characteristic_band_max_Hz` | `6000.0` |
+| `hydrophone_median_peak_frequency_Hz` | `917.1874998840765` |
+| `hydrophone_median_spectral_centroid_Hz` | `1058.4925354442587` |
+| `hydrophone_median_spectral_bandwidth_Hz` | `415.7213778935318` |
 | `hydrophone_oscillation_window_start_s` | `300.0` |
 | `hydrophone_oscillation_window_end_s` | `700.0` |
 | `hydrophone_oscillation_samples` | `1250` |
@@ -70,6 +75,11 @@ Notebook marker values are reproduced for comparison. If the test log says CHF w
 | `ae_wfs_band_power_min_V2` | `5.813551464174776e-09` |
 | `ae_wfs_band_power_max_V2` | `4.988348159708457e-05` |
 | `ae_wfs_band_power_mean_V2` | `4.854611507127646e-06` |
+| `ae_wfs_characteristic_band_min_Hz` | `0.0` |
+| `ae_wfs_characteristic_band_max_Hz` | `250000.0` |
+| `ae_wfs_median_peak_frequency_Hz` | `8422.8515625` |
+| `ae_wfs_median_spectral_centroid_Hz` | `8485.341637361846` |
+| `ae_wfs_median_spectral_bandwidth_Hz` | `4733.620794645545` |
 | `ae_wfs_oscillation_window_start_s` | `300.0` |
 | `ae_wfs_oscillation_window_end_s` | `700.0` |
 | `ae_wfs_oscillation_samples` | `953` |

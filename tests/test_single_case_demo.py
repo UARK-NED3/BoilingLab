@@ -2,7 +2,11 @@ import unittest
 
 import numpy as np
 
-from scripts.run_single_case_demo import band_power_oscillation_spectrum, integrate_band_power
+from scripts.run_single_case_demo import (
+    band_power_oscillation_spectrum,
+    characteristic_frequencies,
+    integrate_band_power,
+)
 
 
 class IntegratedBandPowerTests(unittest.TestCase):
@@ -42,6 +46,29 @@ class IntegratedBandPowerTests(unittest.TestCase):
                 band_min_hz=300.0,
                 band_max_hz=400.0,
             )
+
+
+class CharacteristicFrequencyTests(unittest.TestCase):
+    def test_computes_peak_centroid_and_bandwidth(self):
+        frequencies = np.array([100.0, 200.0, 300.0])
+        psd = np.array(
+            [
+                [1.0, 0.0],
+                [2.0, 1.0],
+                [1.0, 3.0],
+            ]
+        )
+
+        peak, centroid, bandwidth = characteristic_frequencies(
+            frequencies,
+            psd,
+            band_min_hz=100.0,
+            band_max_hz=300.0,
+        )
+
+        np.testing.assert_allclose(peak, [200.0, 300.0])
+        np.testing.assert_allclose(centroid, [200.0, 275.0])
+        np.testing.assert_allclose(bandwidth, [70.710678, 43.30127], rtol=1e-6)
 
 
 class BandPowerOscillationTests(unittest.TestCase):

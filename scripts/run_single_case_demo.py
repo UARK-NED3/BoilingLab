@@ -144,6 +144,105 @@ def integrate_band_power(
     return band_integrated_power, band_integrated_power_db
 
 
+def characteristic_frequencies(
+    frequencies: np.ndarray,
+    psd: np.ndarray,
+    band_min_hz: float,
+    band_max_hz: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    band_mask = (frequencies > 0) & (frequencies >= band_min_hz) & (frequencies <= band_max_hz)
+    if not np.any(band_mask):
+        raise ValueError(
+            f"No PSD frequency bins found between {band_min_hz:g} and {band_max_hz:g} Hz"
+        )
+
+    band_frequencies = frequencies[band_mask]
+    band_psd = psd[band_mask, :]
+    spectral_power = np.sum(band_psd, axis=0)
+    valid = spectral_power > 0
+
+    peak_frequency = np.full(band_psd.shape[1], np.nan)
+    centroid_frequency = np.full(band_psd.shape[1], np.nan)
+    bandwidth = np.full(band_psd.shape[1], np.nan)
+
+    if np.any(valid):
+        peak_indices = np.nanargmax(band_psd[:, valid], axis=0)
+        peak_frequency[valid] = band_frequencies[peak_indices]
+        centroid_frequency[valid] = (
+            np.sum(band_frequencies[:, None] * band_psd[:, valid], axis=0)
+            / spectral_power[valid]
+        )
+        variance = (
+            np.sum(
+                ((band_frequencies[:, None] - centroid_frequency[valid]) ** 2)
+                * band_psd[:, valid],
+                axis=0,
+            )
+            / spectral_power[valid]
+        )
+        bandwidth[valid] = np.sqrt(variance)
+
+    return peak_frequency, centroid_frequency, bandwidth
+
+
+def save_characteristic_frequency_analysis(
+    prefix: str,
+    times: np.ndarray,
+    frequencies: np.ndarray,
+    psd: np.ndarray,
+    output_dir: Path,
+    plots_dir: Path,
+    band_min_hz: float,
+    band_max_hz: float,
+    color: str,
+) -> dict[str, object]:
+    peak_frequency, centroid_frequency, bandwidth = characteristic_frequencies(
+        frequencies,
+        psd,
+        band_min_hz=band_min_hz,
+        band_max_hz=band_max_hz,
+    )
+
+    pd.DataFrame(
+        {
+            "Time (s)": times,
+            "Peak frequency (Hz)": peak_frequency,
+            "Spectral centroid (Hz)": centroid_frequency,
+            "Spectral bandwidth (Hz)": bandwidth,
+        }
+    ).to_csv(output_dir / f"{prefix}_characteristic_frequencies.csv", index=False)
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(times, peak_frequency / 1e3, color=color, linewidth=1.2, alpha=0.7, label="Peak")
+    ax.plot(
+        times,
+        centroid_frequency / 1e3,
+        color="black",
+        linewidth=1.8,
+        alpha=0.9,
+        label="Centroid",
+    )
+    ax.set_xlim(times[0], times[-1])
+    ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
+    ax.set_ylabel("Frequency, $f$ (kHz)", fontsize=20, fontname="Arial")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.legend(frameon=False, fontsize=15)
+    ax.tick_params(axis="both", which="major", labelsize=16, direction="in", top=True, right=True)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontname("Arial")
+    fig.subplots_adjust(left=0.13, bottom=0.18, right=0.98, top=0.95)
+    fig.savefig(plots_dir / f"{prefix}_characteristic_frequencies.png", dpi=180)
+    plt.close(fig)
+
+    return {
+        f"{prefix}_characteristic_band_min_Hz": float(band_min_hz),
+        f"{prefix}_characteristic_band_max_Hz": float(band_max_hz),
+        f"{prefix}_median_peak_frequency_Hz": float(np.nanmedian(peak_frequency)),
+        f"{prefix}_median_spectral_centroid_Hz": float(np.nanmedian(centroid_frequency)),
+        f"{prefix}_median_spectral_bandwidth_Hz": float(np.nanmedian(bandwidth)),
+    }
+
+
 def band_power_oscillation_spectrum(
     time_s: np.ndarray,
     power_db: np.ndarray,
@@ -366,6 +465,19 @@ def save_hydrophone_analysis(
         "hydrophone_band_power_max_V2": float(np.nanmax(band_integrated_power)),
         "hydrophone_band_power_mean_V2": float(np.nanmean(band_integrated_power)),
     }
+    summary.update(
+        save_characteristic_frequency_analysis(
+            "hydrophone",
+            psd_times,
+            psd_frequencies,
+            psd,
+            plots_dir.parent,
+            plots_dir,
+            band_min_hz=band_min_hz,
+            band_max_hz=band_max_hz,
+            color="tab:blue",
+        )
+    )
     summary.update(
         save_band_power_oscillation_analysis(
             "hydrophone",
@@ -674,6 +786,19 @@ def save_wfs_ae_spectrogram(
         "ae_wfs_band_power_max_V2": float(np.nanmax(band_integrated_power)),
         "ae_wfs_band_power_mean_V2": float(np.nanmean(band_integrated_power)),
     }
+    summary.update(
+        save_characteristic_frequency_analysis(
+            "ae_wfs",
+            times,
+            frequencies,
+            sxx,
+            plots_dir.parent,
+            plots_dir,
+            band_min_hz=band_min_hz,
+            band_max_hz=band_max_hz,
+            color="tab:green",
+        )
+    )
     summary.update(
         save_band_power_oscillation_analysis(
             "ae_wfs",

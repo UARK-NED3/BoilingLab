@@ -104,6 +104,12 @@ also saves the oscillation spectra as CSV and PNG files. Use
 `--oscillation-start-s`, `--oscillation-end-s`, and
 `--oscillation-max-frequency-hz` to adjust this analysis window.
 
+For time-resolved spectral content, the runner computes characteristic
+frequencies from each spectrogram time bin. The generated CSV files include
+peak frequency, spectral centroid, and spectral bandwidth; the companion PNGs
+plot peak frequency and spectral centroid over time for hydrophone and AE
+waveform data.
+
 ## Compare Multiple Cases
 
 To compare boiling curves for the default heat-load sweep
