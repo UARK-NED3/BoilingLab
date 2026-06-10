@@ -75,6 +75,41 @@ def top2_with_gap(
     return chf_idx, nbr_idx
 
 
+def detect_dnb_time(
+    time_s: np.ndarray,
+    heat_flux: np.ndarray,
+    search_end_s: float,
+    drop_window_s: float = 5.0,
+) -> tuple[int, int]:
+    finite = np.isfinite(time_s) & np.isfinite(heat_flux)
+    if np.sum(finite) < 3:
+        raise ValueError("Need at least three finite heat-flux samples for DNB detection.")
+
+    sample_spacing_s = float(np.nanmedian(np.diff(time_s[finite])))
+    drop_points = max(1, int(round(drop_window_s / sample_spacing_s)))
+    if len(time_s) <= drop_points:
+        raise ValueError("DNB drop window is longer than the heat-flux series.")
+
+    delta_q = heat_flux[drop_points:] - heat_flux[:-drop_points]
+    drop_start_time = time_s[:-drop_points]
+    drop_candidates = np.where(
+        finite[:-drop_points]
+        & finite[drop_points:]
+        & (drop_start_time >= 0)
+        & (drop_start_time <= search_end_s)
+    )[0]
+    if drop_candidates.size == 0:
+        raise ValueError("No heat-flux samples found inside the DNB search window.")
+
+    drop_start_idx = int(drop_candidates[np.nanargmin(delta_q[drop_candidates])])
+    pre_drop_candidates = np.where(finite & (time_s >= 0) & (time_s <= time_s[drop_start_idx]))[0]
+    if pre_drop_candidates.size == 0:
+        raise ValueError("No heat-flux samples found before the DNB drop.")
+
+    dnb_idx = first_max_index(heat_flux, pre_drop_candidates, time_s)
+    return dnb_idx, drop_start_idx
+
+
 def compute_temperature_quantities(temp: pd.DataFrame) -> dict[str, np.ndarray]:
     time_s = temp["Time (sec)"].to_numpy(dtype=float)
     thermocouples = np.column_stack(
@@ -127,12 +162,49 @@ def save_line_plot(path: Path, x, y, title: str, xlabel: str, ylabel: str, color
     plt.close(fig)
 
 
+def add_event_markers(
+    ax: plt.Axes,
+    dnb_time_s: float | None = None,
+    off_time_s: float | None = None,
+) -> None:
+    ymin, ymax = ax.get_ylim()
+    label_y = ymax - 0.06 * (ymax - ymin)
+    if dnb_time_s is not None:
+        ax.axvline(dnb_time_s, color="black", linestyle="--", linewidth=1.3)
+        ax.text(
+            dnb_time_s,
+            label_y,
+            r"$t_{\mathrm{DNB}}$",
+            rotation=90,
+            va="top",
+            ha="right",
+            fontsize=13,
+            fontname="Arial",
+            color="black",
+        )
+    if off_time_s is not None:
+        ax.axvline(off_time_s, color="0.35", linestyle="--", linewidth=1.3)
+        ax.text(
+            off_time_s,
+            label_y,
+            r"$t_{\mathrm{off}}$",
+            rotation=90,
+            va="top",
+            ha="right",
+            fontsize=13,
+            fontname="Arial",
+            color="0.35",
+        )
+
+
 def save_temperature_profile_plot(
     path: Path,
     time_s: np.ndarray,
     thermocouples: np.ndarray,
     surface_temperature: np.ndarray,
     title: str,
+    dnb_time_s: float | None = None,
+    off_time_s: float | None = None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(14, 6))
     linewidth = 1.6
@@ -159,6 +231,7 @@ def save_temperature_profile_plot(
     ax.set_xlabel("Time, $t$ (s)", fontsize=18, fontname="Arial")
     ax.set_ylabel("Temperature, $T$ ($^\\circ$C)", fontsize=18, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
+    add_event_markers(ax, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
     ax.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True, right=True)
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontname("Arial")
@@ -175,6 +248,8 @@ def save_heat_flux_power_plot(
     dc_time_s: np.ndarray | None,
     power_w: np.ndarray | None,
     title: str,
+    dnb_time_s: float | None = None,
+    off_time_s: float | None = None,
 ) -> None:
     fig, ax_heat_flux = plt.subplots(figsize=(14, 6))
     linewidth = 1.6
@@ -191,6 +266,7 @@ def save_heat_flux_power_plot(
     ax_heat_flux.set_xlabel("Time, $t$ (s)", fontsize=18, fontname="Arial")
     ax_heat_flux.set_ylabel("Heat flux, $q''$ (W/cm$^2$)", fontsize=18, fontname="Arial")
     ax_heat_flux.grid(True, linestyle="--", alpha=0.4)
+    add_event_markers(ax_heat_flux, dnb_time_s=dnb_time_s, off_time_s=off_time_s)
     ax_heat_flux.tick_params(
         axis="both",
         which="major",
@@ -1139,6 +1215,12 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         chf_t_end=args.chf_marker_end_s,
         gap_s=args.nbr_gap_s,
     )
+    dnb_idx, dnb_drop_start_idx = detect_dnb_time(
+        time_s,
+        heat_flux,
+        search_end_s=args.dnb_search_end_s,
+        drop_window_s=args.dnb_drop_window_s,
+    )
     q_min_idx = int(np.nanargmin(heat_flux[chf_idx : nbr_idx + 1]) + chf_idx)
 
     summary: dict[str, object] = {
@@ -1157,6 +1239,11 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         "time_at_max_surface_temp_s": float(time_s[np.nanargmax(surface_temperature)]),
         "max_heat_flux_W_cm2": float(np.nanmax(heat_flux)),
         "time_at_max_heat_flux_s": float(time_s[np.nanargmax(heat_flux)]),
+        "dnb_time_s": float(time_s[dnb_idx]),
+        "dnb_heat_flux_W_cm2": float(heat_flux[dnb_idx]),
+        "dnb_drop_start_time_s": float(time_s[dnb_drop_start_idx]),
+        "dnb_search_end_s": float(args.dnb_search_end_s),
+        "dnb_drop_window_s": float(args.dnb_drop_window_s),
         "chf_proxy_time_s": float(time_s[chf_idx]),
         "chf_proxy_W_cm2": float(heat_flux[chf_idx]),
         "htc_at_chf_proxy_W_cm2K": float(htc[chf_idx]),
@@ -1172,6 +1259,7 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     dc_path = folder / "DC_power.lvm"
     dc_time = None
     power = None
+    shut_time = None
     if dc_path.exists():
         dc = read_lvm(folder, "DC_power.lvm")
         dc = dc.rename(
@@ -1230,6 +1318,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         dc_time,
         power,
         f"{test_id} Heat Flux vs Time",
+        dnb_time_s=float(time_s[dnb_idx]),
+        off_time_s=shut_time,
     )
     save_temperature_profile_plot(
         plots_dir / "surface_temperature.png",
@@ -1237,6 +1327,8 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         temp_data["thermocouples"],
         surface_temperature,
         f"{test_id} Temperature vs Time",
+        dnb_time_s=float(time_s[dnb_idx]),
+        off_time_s=shut_time,
     )
 
     if not args.skip_sensors:
@@ -1299,6 +1391,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--chf-marker-start-s", type=float, default=50.0)
     parser.add_argument("--chf-marker-end-s", type=float, default=100.0)
     parser.add_argument("--nbr-gap-s", type=float, default=200.0)
+    parser.add_argument(
+        "--dnb-search-end-s",
+        type=float,
+        default=250.0,
+        help="End time for finding the early sudden heat-flux drop used to identify DNB.",
+    )
+    parser.add_argument(
+        "--dnb-drop-window-s",
+        type=float,
+        default=5.0,
+        help="Time interval used to detect the sudden DNB heat-flux drop.",
+    )
     parser.add_argument(
         "--hydrophone-band-min-hz",
         type=float,

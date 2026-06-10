@@ -5,6 +5,7 @@ import numpy as np
 from scripts.run_single_case_demo import (
     band_power_oscillation_spectrum,
     characteristic_frequencies,
+    detect_dnb_time,
     integrate_band_power,
     power_centroid_alignment,
 )
@@ -70,6 +71,22 @@ class CharacteristicFrequencyTests(unittest.TestCase):
         np.testing.assert_allclose(peak, [200.0, 300.0])
         np.testing.assert_allclose(centroid, [200.0, 275.0])
         np.testing.assert_allclose(bandwidth, [70.710678, 43.30127], rtol=1e-6)
+
+
+class DnbDetectionTests(unittest.TestCase):
+    def test_finds_maximum_before_sudden_heat_flux_drop(self):
+        time = np.arange(0.0, 12.0, 1.0)
+        heat_flux = np.array([0.0, 4.0, 8.0, 11.0, 12.0, 10.0, 3.0, 4.0, 6.0, 7.0, 8.0, 9.0])
+
+        dnb_index, drop_start_index = detect_dnb_time(
+            time,
+            heat_flux,
+            search_end_s=8.0,
+            drop_window_s=1.0,
+        )
+
+        self.assertEqual(drop_start_index, 5)
+        self.assertEqual(dnb_index, 4)
 
 
 class BandPowerOscillationTests(unittest.TestCase):

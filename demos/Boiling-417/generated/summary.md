@@ -19,6 +19,11 @@ Notebook marker values are reproduced for comparison. If the test log says CHF w
 | `time_at_max_surface_temp_s` | `132.4` |
 | `max_heat_flux_W_cm2` | `277.95529029921306` |
 | `time_at_max_heat_flux_s` | `608.4` |
+| `dnb_time_s` | `124.8` |
+| `dnb_heat_flux_W_cm2` | `190.67491149606312` |
+| `dnb_drop_start_time_s` | `127.2` |
+| `dnb_search_end_s` | `250.0` |
+| `dnb_drop_window_s` | `5.0` |
 | `chf_proxy_time_s` | `100.0` |
 | `chf_proxy_W_cm2` | `177.26038907086644` |
 | `htc_at_chf_proxy_W_cm2K` | `5.4872578814166415` |
