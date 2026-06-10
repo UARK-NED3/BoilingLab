@@ -167,7 +167,7 @@ def save_hydrophone_analysis(folder: Path, plots_dir: Path) -> dict[str, object]
     masked_frequencies = frequencies[freq_mask]
     masked_sxx_log = sxx_log[freq_mask, :]
 
-    fig, ax = plt.subplots(figsize=(16, 7))
+    fig, ax = plt.subplots(figsize=(16, 7), constrained_layout=True)
     spectrogram_image = ax.imshow(
         masked_sxx_log,
         extent=[times[0], times[-1], masked_frequencies[-1] / 1e3, masked_frequencies[0] / 1e3],
@@ -178,14 +178,15 @@ def save_hydrophone_analysis(folder: Path, plots_dir: Path) -> dict[str, object]
         vmax=-40,
     )
     ax.invert_yaxis()
-    ax.set_ylabel("Frequency (kHz)", fontsize=14)
-    ax.set_xlabel("Time (s)", fontsize=14)
+    ax.set_ylabel("Frequency, $f$ (kHz)", fontsize=24, fontname="Arial")
+    ax.set_xlabel("Time, $t$ (s)", fontsize=24, fontname="Arial")
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:.1f}"))
-    colorbar = fig.colorbar(spectrogram_image, ax=[ax], fraction=0.05, pad=0.04)
-    colorbar.set_label("Power (dB)", fontsize=14)
-    colorbar.ax.tick_params(labelsize=12)
-    ax.tick_params(axis="both", which="major", labelsize=12)
-    fig.tight_layout()
+    colorbar = fig.colorbar(spectrogram_image, ax=ax, fraction=0.035, pad=0.03)
+    colorbar.set_label("Power (dB)", fontsize=22, fontname="Arial")
+    colorbar.ax.tick_params(labelsize=18)
+    ax.tick_params(axis="both", which="major", labelsize=20)
+    for label in ax.get_xticklabels() + ax.get_yticklabels() + colorbar.ax.get_yticklabels():
+        label.set_fontname("Arial")
     fig.savefig(plots_dir / "hydrophone_spectrogram.png", dpi=180)
     plt.close(fig)
 
