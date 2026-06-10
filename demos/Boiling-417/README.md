@@ -27,7 +27,9 @@ python scripts\run_single_case_demo.py
 
 That command writes generated outputs to `demos\Boiling-417\generated`,
 including hydrophone and acoustic-emission plots when those raw files are
-present. Use `--skip-sensors` for a faster thermal-only run.
+present. The hydrophone scalar plot uses the PSD integrated over frequency,
+reported as a band-limited voltage-squared acoustic-power proxy. Use
+`--skip-sensors` for a faster thermal-only run.
 
 The notebook's current heat-flux marker logic searches for a maximum in a fixed
 time window and labels the result as `CHF`. Because the test log marks
@@ -76,5 +78,6 @@ Regenerated script outputs include:
 
 - `generated/plots/hydrophone_raw.png`
 - `generated/plots/hydrophone_spectrogram.png`
+- `generated/plots/hydrophone_band_integrated_power.png`
 - `generated/plots/ae_hit_parameters.png`
 - `generated/plots/ae_time_parameters.png`

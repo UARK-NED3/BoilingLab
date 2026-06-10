@@ -67,13 +67,19 @@ The default command analyzes `Boiling-417` from
 files and plots to `demos\Boiling-417\generated`. The generated outputs include
 thermal/pressure/DC plots plus hydrophone raw/spectrogram plots and acoustic
 emission hit/time parameter plots when `Hydrophones.lvm`, `AE_Hit.TXT`, and
-`AE_Time.TXT` are present.
+`AE_Time.TXT` are present. The hydrophone analysis also computes a
+band-integrated PSD scalar over time by integrating the PSD over frequency; this
+is a voltage-squared acoustic-power proxy unless the hydrophone signal is
+calibrated to pressure.
 
 For a faster thermal-only run:
 
 ```powershell
 python scripts\run_single_case_demo.py --skip-sensors
 ```
+
+Use `--hydrophone-band-min-hz` and `--hydrophone-band-max-hz` to change the
+frequency band used for the integrated PSD time trace.
 
 ## Compare Multiple Cases
 

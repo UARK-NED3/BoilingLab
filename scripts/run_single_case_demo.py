@@ -113,7 +113,7 @@ def compute_temperature_quantities(temp: pd.DataFrame) -> dict[str, np.ndarray]:
 
 
 def save_line_plot(path: Path, x, y, title: str, xlabel: str, ylabel: str, color: str) -> None:
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(14, 6))
     ax.plot(x, y, color=color, linewidth=2)
     ax.set_title(title)
     ax.set_xlabel(xlabel)
@@ -124,7 +124,12 @@ def save_line_plot(path: Path, x, y, title: str, xlabel: str, ylabel: str, color
     plt.close(fig)
 
 
-def save_hydrophone_analysis(folder: Path, plots_dir: Path) -> dict[str, object]:
+def save_hydrophone_analysis(
+    folder: Path,
+    plots_dir: Path,
+    band_min_hz: float,
+    band_max_hz: float,
+) -> dict[str, object]:
     path = folder / "Hydrophones.lvm"
     if not path.exists():
         return {"hydrophone_available": False}
@@ -155,12 +160,14 @@ def save_hydrophone_analysis(folder: Path, plots_dir: Path) -> dict[str, object]
     hydro_time = hydrophones["Time"].to_numpy(dtype=float)
     hydro_voltage = hydrophones["Voltage"].to_numpy(dtype=float)
     sampling_frequency = 1 / np.mean(np.diff(hydro_time))
+    nperseg = 4096 * 2
+    noverlap = nperseg // 2
     frequencies, times, sxx = spectrogram(
         hydro_voltage,
         sampling_frequency,
         scaling="spectrum",
-        nperseg=4096 * 2,
-        noverlap=4096,
+        nperseg=nperseg,
+        noverlap=noverlap,
     )
     sxx_log = 10 * np.log10(sxx)
     freq_mask = frequencies <= 6e3
@@ -190,10 +197,53 @@ def save_hydrophone_analysis(folder: Path, plots_dir: Path) -> dict[str, object]
     fig.savefig(plots_dir / "hydrophone_spectrogram.png", dpi=180)
     plt.close(fig)
 
+    psd_frequencies, psd_times, psd = spectrogram(
+        hydro_voltage,
+        sampling_frequency,
+        scaling="density",
+        nperseg=nperseg,
+        noverlap=noverlap,
+    )
+    band_mask = (psd_frequencies >= band_min_hz) & (psd_frequencies <= band_max_hz)
+    if not np.any(band_mask):
+        raise ValueError(
+            f"No PSD frequency bins found between {band_min_hz:g} and {band_max_hz:g} Hz"
+        )
+
+    band_integrated_power = np.trapezoid(psd[band_mask, :], psd_frequencies[band_mask], axis=0)
+    band_integrated_power_db = 10 * np.log10(band_integrated_power + np.finfo(float).tiny)
+
+    band_power_df = pd.DataFrame(
+        {
+            "Time (s)": psd_times,
+            "Band-integrated hydrophone power proxy (V^2)": band_integrated_power,
+            "Band-integrated hydrophone power proxy (dB re V^2)": band_integrated_power_db,
+        }
+    )
+    band_power_df.to_csv(plots_dir.parent / "hydrophone_band_integrated_power.csv", index=False)
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(psd_times, band_integrated_power_db, color="tab:blue", linewidth=1.8)
+    ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
+    ax.set_ylabel("Band-integrated power (dB re V²)", fontsize=20, fontname="Arial")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.tick_params(axis="both", which="major", labelsize=16, direction="in", top=True, right=True)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontname("Arial")
+    fig.subplots_adjust(left=0.16, bottom=0.18, right=0.98, top=0.95)
+    fig.savefig(plots_dir / "hydrophone_band_integrated_power.png", dpi=180)
+    plt.close(fig)
+
     return {
         "hydrophone_available": True,
         "hydrophone_rows": int(len(hydrophones)),
         "hydrophone_sampling_frequency_Hz": float(sampling_frequency),
+        "hydrophone_band_min_Hz": float(band_min_hz),
+        "hydrophone_band_max_Hz": float(band_max_hz),
+        "hydrophone_band_power_time_bins": int(len(psd_times)),
+        "hydrophone_band_power_min_V2": float(np.nanmin(band_integrated_power)),
+        "hydrophone_band_power_max_V2": float(np.nanmax(band_integrated_power)),
+        "hydrophone_band_power_mean_V2": float(np.nanmean(band_integrated_power)),
     }
 
 
@@ -449,7 +499,14 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     )
 
     if not args.skip_sensors:
-        summary.update(save_hydrophone_analysis(folder, plots_dir))
+        summary.update(
+            save_hydrophone_analysis(
+                folder,
+                plots_dir,
+                band_min_hz=args.hydrophone_band_min_hz,
+                band_max_hz=args.hydrophone_band_max_hz,
+            )
+        )
         summary.update(save_ae_analysis(folder, plots_dir))
 
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
@@ -482,6 +539,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--chf-marker-start-s", type=float, default=50.0)
     parser.add_argument("--chf-marker-end-s", type=float, default=100.0)
     parser.add_argument("--nbr-gap-s", type=float, default=200.0)
+    parser.add_argument(
+        "--hydrophone-band-min-hz",
+        type=float,
+        default=0.0,
+        help="Lower frequency bound for band-integrated hydrophone PSD.",
+    )
+    parser.add_argument(
+        "--hydrophone-band-max-hz",
+        type=float,
+        default=6000.0,
+        help="Upper frequency bound for band-integrated hydrophone PSD.",
+    )
     parser.add_argument(
         "--skip-sensors",
         action="store_true",

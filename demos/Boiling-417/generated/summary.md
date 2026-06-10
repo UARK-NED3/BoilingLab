@@ -36,6 +36,12 @@ Notebook marker values are reproduced for comparison. If the test log says CHF w
 | `hydrophone_available` | `True` |
 | `hydrophone_rows` | `12659200` |
 | `hydrophone_sampling_frequency_Hz` | `12799.999998382205` |
+| `hydrophone_band_min_Hz` | `0.0` |
+| `hydrophone_band_max_Hz` | `6000.0` |
+| `hydrophone_band_power_time_bins` | `3089` |
+| `hydrophone_band_power_min_V2` | `2.662287225914444e-07` |
+| `hydrophone_band_power_max_V2` | `0.3443237708393874` |
+| `hydrophone_band_power_mean_V2` | `0.015699904145764908` |
 | `ae_hit_available` | `True` |
 | `ae_time_available` | `True` |
 | `ae_hit_rows` | `61864` |
