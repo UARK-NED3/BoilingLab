@@ -41,6 +41,8 @@ python scripts\run_single_case_demo.py --include-wfs
 The `.wfs` path is detected from the raw Boiling-417 folder and decoded with
 `decode-wfs`; channel 1 is used unless `--wfs-channel` is supplied. The same
 run also saves the band-integrated AE waveform PSD time trace as a CSV and PNG.
+The demo additionally computes the dominant slow oscillation in the
+band-integrated hydrophone and AE traces over the default `300-700 s` window.
 
 The notebook's current heat-flux marker logic searches for a maximum in a fixed
 time window and labels the result as `CHF`. Because the test log marks
@@ -95,3 +97,7 @@ Regenerated script outputs include:
 - `generated/plots/ae_wfs_spectrogram.png` when `--include-wfs` is used
 - `generated/plots/ae_wfs_band_integrated_power.png` when `--include-wfs` is used
 - `generated/ae_wfs_band_integrated_power.csv` when `--include-wfs` is used
+- `generated/plots/hydrophone_band_power_oscillation_spectrum.png`
+- `generated/hydrophone_band_power_oscillation_spectrum.csv`
+- `generated/plots/ae_wfs_band_power_oscillation_spectrum.png` when `--include-wfs` is used
+- `generated/ae_wfs_band_power_oscillation_spectrum.csv` when `--include-wfs` is used

@@ -37,6 +37,12 @@
   "hydrophone_band_power_min_V2": 2.662287225914444e-07,
   "hydrophone_band_power_max_V2": 0.3443237708393874,
   "hydrophone_band_power_mean_V2": 0.015699904145764908,
+  "hydrophone_oscillation_window_start_s": 300.0,
+  "hydrophone_oscillation_window_end_s": 700.0,
+  "hydrophone_oscillation_samples": 1250,
+  "hydrophone_dominant_oscillation_frequency_Hz": 0.07999999998989779,
+  "hydrophone_dominant_oscillation_period_s": 12.50000000157847,
+  "hydrophone_oscillation_label": "Hydrophone",
   "ae_hit_available": true,
   "ae_time_available": true,
   "ae_hit_rows": 61864,
@@ -58,5 +64,11 @@
   "ae_wfs_band_power_time_bins": 2400,
   "ae_wfs_band_power_min_V2": 5.813551464174776e-09,
   "ae_wfs_band_power_max_V2": 4.988348159708457e-05,
-  "ae_wfs_band_power_mean_V2": 4.854611507127646e-06
+  "ae_wfs_band_power_mean_V2": 4.854611507127646e-06,
+  "ae_wfs_oscillation_window_start_s": 300.0,
+  "ae_wfs_oscillation_window_end_s": 700.0,
+  "ae_wfs_oscillation_samples": 953,
+  "ae_wfs_dominant_oscillation_frequency_Hz": 0.0800619407210555,
+  "ae_wfs_dominant_oscillation_period_s": 12.490329250000428,
+  "ae_wfs_oscillation_label": "AE waveform"
 }

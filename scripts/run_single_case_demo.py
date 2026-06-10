@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pyXSteam.XSteam import XSteam
-from scipy.signal import get_window, spectrogram
+from scipy.signal import detrend, get_window, spectrogram, welch
 import matplotlib.ticker as mticker
 
 
@@ -144,11 +144,112 @@ def integrate_band_power(
     return band_integrated_power, band_integrated_power_db
 
 
+def band_power_oscillation_spectrum(
+    time_s: np.ndarray,
+    power_db: np.ndarray,
+    window_start_s: float,
+    window_end_s: float,
+    max_frequency_hz: float,
+) -> tuple[np.ndarray, np.ndarray, float, float, int]:
+    mask = (
+        (time_s >= window_start_s)
+        & (time_s <= window_end_s)
+        & np.isfinite(time_s)
+        & np.isfinite(power_db)
+    )
+    selected_time = time_s[mask]
+    selected_power = power_db[mask]
+    if len(selected_time) < 8:
+        raise ValueError(
+            f"Need at least 8 samples between {window_start_s:g} and {window_end_s:g} s "
+            "for oscillation analysis."
+        )
+
+    sample_spacing_s = float(np.median(np.diff(selected_time)))
+    sampling_frequency_hz = 1.0 / sample_spacing_s
+    y = detrend(selected_power - np.nanmean(selected_power), type="linear")
+    nperseg = min(len(y), max(64, int(round(len(y) / 2))))
+    frequencies, psd = welch(
+        y,
+        fs=sampling_frequency_hz,
+        window="hann",
+        nperseg=nperseg,
+        noverlap=nperseg // 2,
+        scaling="density",
+    )
+    min_frequency_hz = 1.0 / max(selected_time[-1] - selected_time[0], sample_spacing_s)
+    frequency_mask = (frequencies >= min_frequency_hz) & (frequencies <= max_frequency_hz)
+    if not np.any(frequency_mask):
+        raise ValueError("No oscillation frequency bins found in the requested range.")
+
+    plot_frequencies = frequencies[frequency_mask]
+    plot_psd = psd[frequency_mask]
+    dominant_index = int(np.nanargmax(plot_psd))
+    dominant_frequency_hz = float(plot_frequencies[dominant_index])
+    dominant_period_s = float(1.0 / dominant_frequency_hz)
+    return plot_frequencies, plot_psd, dominant_frequency_hz, dominant_period_s, len(selected_time)
+
+
+def save_band_power_oscillation_analysis(
+    prefix: str,
+    label: str,
+    time_s: np.ndarray,
+    power_db: np.ndarray,
+    output_dir: Path,
+    plots_dir: Path,
+    window_start_s: float,
+    window_end_s: float,
+    max_frequency_hz: float,
+) -> dict[str, object]:
+    frequencies, psd, dominant_frequency_hz, dominant_period_s, n_samples = (
+        band_power_oscillation_spectrum(
+            time_s,
+            power_db,
+            window_start_s=window_start_s,
+            window_end_s=window_end_s,
+            max_frequency_hz=max_frequency_hz,
+        )
+    )
+
+    pd.DataFrame(
+        {
+            "Frequency (Hz)": frequencies,
+            "PSD of band-integrated power (dB^2/Hz)": psd,
+            "Period (s)": 1.0 / frequencies,
+        }
+    ).to_csv(output_dir / f"{prefix}_band_power_oscillation_spectrum.csv", index=False)
+
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    ax.plot(frequencies, psd, color="tab:purple", linewidth=1.8)
+    ax.axvline(dominant_frequency_hz, color="tab:red", linestyle="--", linewidth=1.4)
+    ax.set_xlabel("Oscillation frequency (Hz)", fontsize=18, fontname="Arial")
+    ax.set_ylabel("PSD of band-integrated power (dB$^2$/Hz)", fontsize=18, fontname="Arial")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.tick_params(axis="both", which="major", labelsize=14, direction="in", top=True, right=True)
+    for tick_label in ax.get_xticklabels() + ax.get_yticklabels():
+        tick_label.set_fontname("Arial")
+    fig.subplots_adjust(left=0.15, bottom=0.17, right=0.98, top=0.95)
+    fig.savefig(plots_dir / f"{prefix}_band_power_oscillation_spectrum.png", dpi=180)
+    plt.close(fig)
+
+    return {
+        f"{prefix}_oscillation_window_start_s": float(window_start_s),
+        f"{prefix}_oscillation_window_end_s": float(window_end_s),
+        f"{prefix}_oscillation_samples": int(n_samples),
+        f"{prefix}_dominant_oscillation_frequency_Hz": dominant_frequency_hz,
+        f"{prefix}_dominant_oscillation_period_s": dominant_period_s,
+        f"{prefix}_oscillation_label": label,
+    }
+
+
 def save_hydrophone_analysis(
     folder: Path,
     plots_dir: Path,
     band_min_hz: float,
     band_max_hz: float,
+    oscillation_start_s: float,
+    oscillation_end_s: float,
+    oscillation_max_frequency_hz: float,
 ) -> dict[str, object]:
     path = folder / "Hydrophones.lvm"
     if not path.exists():
@@ -254,7 +355,7 @@ def save_hydrophone_analysis(
     fig.savefig(plots_dir / "hydrophone_band_integrated_power.png", dpi=180)
     plt.close(fig)
 
-    return {
+    summary = {
         "hydrophone_available": True,
         "hydrophone_rows": int(len(hydrophones)),
         "hydrophone_sampling_frequency_Hz": float(sampling_frequency),
@@ -265,6 +366,20 @@ def save_hydrophone_analysis(
         "hydrophone_band_power_max_V2": float(np.nanmax(band_integrated_power)),
         "hydrophone_band_power_mean_V2": float(np.nanmean(band_integrated_power)),
     }
+    summary.update(
+        save_band_power_oscillation_analysis(
+            "hydrophone",
+            "Hydrophone",
+            psd_times,
+            band_integrated_power_db,
+            plots_dir.parent,
+            plots_dir,
+            window_start_s=oscillation_start_s,
+            window_end_s=oscillation_end_s,
+            max_frequency_hz=oscillation_max_frequency_hz,
+        )
+    )
+    return summary
 
 
 def read_ae_hit(path: Path) -> pd.DataFrame:
@@ -436,6 +551,9 @@ def save_wfs_ae_spectrogram(
     max_freq_hz: float,
     band_min_hz: float,
     band_max_hz: float,
+    oscillation_start_s: float,
+    oscillation_end_s: float,
+    oscillation_max_frequency_hz: float,
     vmin_db: float,
     vmax_db: float,
 ) -> dict[str, object]:
@@ -536,7 +654,7 @@ def save_wfs_ae_spectrogram(
     fig.savefig(plots_dir / "ae_wfs_band_integrated_power.png", dpi=180)
     plt.close(fig)
 
-    return {
+    summary = {
         "ae_wfs_available": True,
         "ae_wfs_file": str(wfs_path),
         "ae_wfs_channel": int(channel),
@@ -556,6 +674,20 @@ def save_wfs_ae_spectrogram(
         "ae_wfs_band_power_max_V2": float(np.nanmax(band_integrated_power)),
         "ae_wfs_band_power_mean_V2": float(np.nanmean(band_integrated_power)),
     }
+    summary.update(
+        save_band_power_oscillation_analysis(
+            "ae_wfs",
+            "AE waveform",
+            times,
+            band_integrated_power_db,
+            plots_dir.parent,
+            plots_dir,
+            window_start_s=oscillation_start_s,
+            window_end_s=oscillation_end_s,
+            max_frequency_hz=oscillation_max_frequency_hz,
+        )
+    )
+    return summary
 
 
 def analyze_case(args: argparse.Namespace) -> dict[str, object]:
@@ -698,6 +830,9 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
                 plots_dir,
                 band_min_hz=args.hydrophone_band_min_hz,
                 band_max_hz=args.hydrophone_band_max_hz,
+                oscillation_start_s=args.oscillation_start_s,
+                oscillation_end_s=args.oscillation_end_s,
+                oscillation_max_frequency_hz=args.oscillation_max_frequency_hz,
             )
         )
         summary.update(save_ae_analysis(folder, plots_dir))
@@ -710,6 +845,9 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
                     max_freq_hz=args.wfs_max_freq_hz,
                     band_min_hz=args.wfs_band_min_hz,
                     band_max_hz=args.wfs_band_max_hz,
+                    oscillation_start_s=args.oscillation_start_s,
+                    oscillation_end_s=args.oscillation_end_s,
+                    oscillation_max_frequency_hz=args.oscillation_max_frequency_hz,
                     vmin_db=args.wfs_vmin_db,
                     vmax_db=args.wfs_vmax_db,
                 )
@@ -761,6 +899,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-sensors",
         action="store_true",
         help="Skip hydrophone and acoustic-emission analysis plots.",
+    )
+    parser.add_argument(
+        "--oscillation-start-s",
+        type=float,
+        default=300.0,
+        help="Start time for band-power oscillation frequency analysis.",
+    )
+    parser.add_argument(
+        "--oscillation-end-s",
+        type=float,
+        default=700.0,
+        help="End time for band-power oscillation frequency analysis.",
+    )
+    parser.add_argument(
+        "--oscillation-max-frequency-hz",
+        type=float,
+        default=0.2,
+        help="Maximum oscillation frequency to include in band-power spectrum plots.",
     )
     parser.add_argument(
         "--include-wfs",

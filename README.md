@@ -97,6 +97,13 @@ python scripts\run_single_case_demo.py --skip-sensors
 Use `--hydrophone-band-min-hz` and `--hydrophone-band-max-hz` to change the
 frequency band used for the integrated PSD time trace.
 
+The single-case runner also analyzes slow oscillations in the band-integrated
+power traces. By default, it uses the `300-700 s` interval and reports the
+dominant modulation frequency and period in `summary.json` / `summary.md`. It
+also saves the oscillation spectra as CSV and PNG files. Use
+`--oscillation-start-s`, `--oscillation-end-s`, and
+`--oscillation-max-frequency-hz` to adjust this analysis window.
+
 ## Compare Multiple Cases
 
 To compare boiling curves for the default heat-load sweep
