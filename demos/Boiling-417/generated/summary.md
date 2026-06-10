@@ -33,3 +33,10 @@ Notebook marker values are reproduced for comparison. If the test log says CHF w
 | `surface_temp_at_dc_start_C` | `67.32582513799997` |
 | `dc_shutoff_time_s` | `673.8934380000007` |
 | `surface_temp_at_dc_shutoff_C` | `130.90226886200003` |
+| `hydrophone_available` | `True` |
+| `hydrophone_rows` | `12659200` |
+| `hydrophone_sampling_frequency_Hz` | `12799.999998382205` |
+| `ae_hit_available` | `True` |
+| `ae_time_available` | `True` |
+| `ae_hit_rows` | `61864` |
+| `ae_time_rows` | `100841` |

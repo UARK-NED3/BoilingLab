@@ -64,7 +64,16 @@ python scripts\run_single_case_demo.py
 
 The default command analyzes `Boiling-417` from
 `Y:\0_Ishraq\New Pool Boiling Video\Boiling-417` and writes generated summary
-files and lightweight plots to `demos\Boiling-417\generated`.
+files and plots to `demos\Boiling-417\generated`. The generated outputs include
+thermal/pressure/DC plots plus hydrophone raw/spectrogram plots and acoustic
+emission hit/time parameter plots when `Hydrophones.lvm`, `AE_Hit.TXT`, and
+`AE_Time.TXT` are present.
+
+For a faster thermal-only run:
+
+```powershell
+python scripts\run_single_case_demo.py --skip-sensors
+```
 
 ## Compare Multiple Cases
 

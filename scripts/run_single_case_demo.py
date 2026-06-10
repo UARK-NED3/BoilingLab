@@ -21,6 +21,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pyXSteam.XSteam import XSteam
+from scipy.signal import spectrogram
+import matplotlib.ticker as mticker
 
 
 TC_LOCATION_M = np.array([0, 2.54, 5.08, 7.62]) * 1e-3
@@ -120,6 +122,196 @@ def save_line_plot(path: Path, x, y, title: str, xlabel: str, ylabel: str, color
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
+
+
+def save_hydrophone_analysis(folder: Path, plots_dir: Path) -> dict[str, object]:
+    path = folder / "Hydrophones.lvm"
+    if not path.exists():
+        return {"hydrophone_available": False}
+
+    hydrophones = pd.read_csv(
+        path,
+        skiprows=23,
+        header=None,
+        names=["Time", "Voltage", "Comment"],
+        sep=r"\s+",
+        engine="python",
+    )[["Time", "Voltage"]]
+    hydrophones["Time"] = pd.to_numeric(hydrophones["Time"], errors="coerce")
+    hydrophones["Voltage"] = pd.to_numeric(hydrophones["Voltage"], errors="coerce")
+    hydrophones = hydrophones.dropna(subset=["Time", "Voltage"])
+
+    fig, ax = plt.subplots(figsize=(16, 6))
+    ax.plot(hydrophones["Time"], hydrophones["Voltage"], linewidth=0.8)
+    ax.set_xlabel("Time (s)", fontsize=16)
+    ax.set_ylabel("Voltage (V)", fontsize=16)
+    ax.set_title("Raw Hydrophone Signal vs Time", fontsize=18)
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.tick_params(axis="both", labelsize=13, direction="in", top=True, right=True)
+    fig.tight_layout()
+    fig.savefig(plots_dir / "hydrophone_raw.png", dpi=180)
+    plt.close(fig)
+
+    hydro_time = hydrophones["Time"].to_numpy(dtype=float)
+    hydro_voltage = hydrophones["Voltage"].to_numpy(dtype=float)
+    sampling_frequency = 1 / np.mean(np.diff(hydro_time))
+    frequencies, times, sxx = spectrogram(
+        hydro_voltage,
+        sampling_frequency,
+        scaling="spectrum",
+        nperseg=4096 * 2,
+        noverlap=4096,
+    )
+    sxx_log = 10 * np.log10(sxx)
+    freq_mask = frequencies <= 6e3
+    masked_frequencies = frequencies[freq_mask]
+    masked_sxx_log = sxx_log[freq_mask, :]
+
+    fig, ax = plt.subplots(figsize=(16, 7))
+    spectrogram_image = ax.imshow(
+        masked_sxx_log,
+        extent=[times[0], times[-1], masked_frequencies[-1] / 1e3, masked_frequencies[0] / 1e3],
+        interpolation="bilinear",
+        cmap="viridis",
+        aspect="auto",
+        vmin=-120,
+        vmax=-40,
+    )
+    ax.invert_yaxis()
+    ax.set_ylabel("Frequency (kHz)", fontsize=14)
+    ax.set_xlabel("Time (s)", fontsize=14)
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:.1f}"))
+    colorbar = fig.colorbar(spectrogram_image, ax=[ax], fraction=0.05, pad=0.04)
+    colorbar.set_label("Power (dB)", fontsize=14)
+    colorbar.ax.tick_params(labelsize=12)
+    ax.tick_params(axis="both", which="major", labelsize=12)
+    fig.tight_layout()
+    fig.savefig(plots_dir / "hydrophone_spectrogram.png", dpi=180)
+    plt.close(fig)
+
+    return {
+        "hydrophone_available": True,
+        "hydrophone_rows": int(len(hydrophones)),
+        "hydrophone_sampling_frequency_Hz": float(sampling_frequency),
+    }
+
+
+def read_ae_hit(path: Path) -> pd.DataFrame:
+    columns = [
+        "ID",
+        "AE_Hit_Time",
+        "PARA1",
+        "CH",
+        "RISE",
+        "COUN",
+        "ENER",
+        "DURATION",
+        "A-FRQ",
+        "RMS",
+        "PCNTS",
+        "THR",
+        "R-FRQ",
+        "I-FRQ",
+        "SIG-STRNGTH",
+        "ABS-ENERGY",
+        "FRQ-C",
+        "P-FRQ",
+        "AMP",
+        "ASL",
+    ]
+    return pd.read_csv(path, skiprows=8, header=None, names=columns, sep=r"\s+", engine="python")
+
+
+def read_ae_time(path: Path) -> pd.DataFrame:
+    rows = []
+    current_time = None
+    current_para1 = None
+    with path.open("r", encoding="utf-8", errors="ignore") as handle:
+        for line in handle:
+            line = line.strip()
+            match_main = re.match(r"^\s*\d+\s+([\d.]+)\s+([\d.]+)\s*$", line)
+            if match_main:
+                current_time = float(match_main.group(1))
+                current_para1 = float(match_main.group(2))
+                continue
+            match_ch = re.match(
+                r"^\s*1:\[\s*([\d.Ee+-]+)\s+([\d.Ee+-]+)\s+([\d.Ee+-]+)\s+([\d.Ee+-]+)\s*\]",
+                line,
+            )
+            if match_ch and current_time is not None:
+                rows.append(
+                    {
+                        "AE_Time": current_time,
+                        "PARA1": current_para1,
+                        "RMS": float(match_ch.group(1)),
+                        "THR": float(match_ch.group(2)),
+                        "ABS-ENERGY": float(match_ch.group(3)),
+                        "ASL": float(match_ch.group(4)),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
+def save_ae_analysis(folder: Path, plots_dir: Path) -> dict[str, object]:
+    summary: dict[str, object] = {
+        "ae_hit_available": (folder / "AE_Hit.TXT").exists(),
+        "ae_time_available": (folder / "AE_Time.TXT").exists(),
+    }
+
+    if summary["ae_hit_available"]:
+        ae_hit = read_ae_hit(folder / "AE_Hit.TXT")
+        plot_columns = [
+            "PARA1",
+            "RISE",
+            "COUN",
+            "ENER",
+            "DURATION",
+            "A-FRQ",
+            "RMS",
+            "PCNTS",
+            "R-FRQ",
+            "I-FRQ",
+            "SIG-STRNGTH",
+            "ABS-ENERGY",
+            "FRQ-C",
+            "P-FRQ",
+            "AMP",
+            "ASL",
+        ]
+        fig, axes = plt.subplots(4, 4, figsize=(20, 16), sharex=False)
+        for ax, column in zip(axes.ravel(), plot_columns):
+            ax.scatter(ae_hit["AE_Hit_Time"], ae_hit[column], s=0.5, alpha=0.7)
+            ax.set_title(f"{column} vs AE_Time", fontsize=12)
+            ax.set_xlabel("AE_Time (s)", fontsize=10)
+            ax.set_ylabel(column, fontsize=10)
+            ax.grid(True, linestyle="--", alpha=0.4)
+            ax.tick_params(axis="both", labelsize=9)
+        fig.suptitle("AE Hit Parameters", fontsize=16, y=1.02)
+        fig.tight_layout()
+        fig.savefig(plots_dir / "ae_hit_parameters.png", dpi=180, bbox_inches="tight")
+        plt.close(fig)
+        summary["ae_hit_rows"] = int(len(ae_hit))
+
+    if summary["ae_time_available"]:
+        ae_time = read_ae_time(folder / "AE_Time.TXT")
+        ae_time = ae_time.dropna(subset=["AE_Time", "PARA1", "RMS", "ABS-ENERGY", "ASL"])
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10), sharex=True)
+        series = [("PARA1", "PARA1"), ("RMS", "RMS"), ("ABS-ENERGY", "ABS-ENERGY"), ("ASL", "ASL")]
+        for ax, (column, ylabel) in zip(axes.ravel(), series):
+            ax.plot(ae_time["AE_Time"], ae_time[column], linewidth=1)
+            ax.set_title(f"{column} vs AE_Time", fontsize=13)
+            ax.set_ylabel(ylabel, fontsize=11)
+            ax.grid(True, linestyle="--", alpha=0.4)
+            ax.tick_params(axis="both", labelsize=10)
+        axes[1, 0].set_xlabel("AE_Time (s)", fontsize=11)
+        axes[1, 1].set_xlabel("AE_Time (s)", fontsize=11)
+        fig.suptitle("AE Time Parameters", fontsize=16, y=1.02)
+        fig.tight_layout()
+        fig.savefig(plots_dir / "ae_time_parameters.png", dpi=180, bbox_inches="tight")
+        plt.close(fig)
+        summary["ae_time_rows"] = int(len(ae_time))
+
+    return summary
 
 
 def analyze_case(args: argparse.Namespace) -> dict[str, object]:
@@ -255,6 +447,10 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         "tab:purple",
     )
 
+    if not args.skip_sensors:
+        summary.update(save_hydrophone_analysis(folder, plots_dir))
+        summary.update(save_ae_analysis(folder, plots_dir))
+
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     write_summary_markdown(output_dir / "summary.md", summary)
     return summary
@@ -285,6 +481,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--chf-marker-start-s", type=float, default=50.0)
     parser.add_argument("--chf-marker-end-s", type=float, default=100.0)
     parser.add_argument("--nbr-gap-s", type=float, default=200.0)
+    parser.add_argument(
+        "--skip-sensors",
+        action="store_true",
+        help="Skip hydrophone and acoustic-emission analysis plots.",
+    )
     return parser
 
 

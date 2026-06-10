@@ -25,7 +25,9 @@ The reproducible lightweight demo runner is:
 python scripts\run_single_case_demo.py
 ```
 
-That command writes generated outputs to `demos\Boiling-417\generated`.
+That command writes generated outputs to `demos\Boiling-417\generated`,
+including hydrophone and acoustic-emission plots when those raw files are
+present. Use `--skip-sensors` for a faster thermal-only run.
 
 The notebook's current heat-flux marker logic searches for a maximum in a fixed
 time window and labels the result as `CHF`. Because the test log marks
@@ -69,3 +71,10 @@ Y:\0_Ishraq\New Pool Boiling Video\Boiling-417\Boiling-417_csv_data.csv
 - [Pressure profile](plots/pressure_profile.png)
 - [MagnaDC profile](plots/magnadc_profile.png)
 - [Hydrophone spectrogram](plots/hydrophone_spectrogram.png)
+
+Regenerated script outputs include:
+
+- `generated/plots/hydrophone_raw.png`
+- `generated/plots/hydrophone_spectrogram.png`
+- `generated/plots/ae_hit_parameters.png`
+- `generated/plots/ae_time_parameters.png`
