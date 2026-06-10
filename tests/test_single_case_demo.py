@@ -196,6 +196,34 @@ class AcousticEventMarkerPlotTests(unittest.TestCase):
         self.assertEqual(markers.call_args.kwargs["peak_time_s"], 2.0)
         self.assertEqual(markers.call_args.kwargs["off_time_s"], 3.0)
 
+    def test_characteristic_frequency_plot_starts_x_axis_at_zero(self):
+        times = np.linspace(0.5, 4.5, 5)
+        frequencies = np.array([0.0, 1000.0, 2000.0])
+        psd = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [1.0, 1.0, 1.0, 1.0, 1.0],
+                [0.5, 0.5, 0.5, 0.5, 0.5],
+            ]
+        )
+
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            with patch("matplotlib.axes.Axes.set_xlim") as set_xlim:
+                save_characteristic_frequency_analysis(
+                    "unit",
+                    times,
+                    frequencies,
+                    psd,
+                    output_dir,
+                    output_dir,
+                    band_min_hz=0.0,
+                    band_max_hz=2000.0,
+                    color="tab:blue",
+                )
+
+        set_xlim.assert_any_call(0, times[-1])
+
 
 if __name__ == "__main__":
     unittest.main()

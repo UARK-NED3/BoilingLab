@@ -473,7 +473,7 @@ def save_characteristic_frequency_analysis(
         alpha=0.9,
         label="Centroid",
     )
-    ax.set_xlim(times[0], times[-1])
+    ax.set_xlim(0, times[-1])
     ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
     ax.set_ylabel("Frequency, $f$ (kHz)", fontsize=20, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
@@ -866,7 +866,7 @@ def save_hydrophone_analysis(
 
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(psd_times, band_integrated_power_db, color="tab:blue", linewidth=1.8)
-    ax.set_xlim(times[0], times[-1])
+    ax.set_xlim(0, times[-1])
     ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
     ax.set_ylabel("Band-integrated power (dB re V²)", fontsize=20, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
@@ -1206,7 +1206,7 @@ def save_wfs_ae_spectrogram(
 
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(times, band_integrated_power_db, color="tab:green", linewidth=1.8)
-    ax.set_xlim(times[0], times[-1])
+    ax.set_xlim(0, times[-1])
     ax.set_xlabel("Time, $t$ (s)", fontsize=20, fontname="Arial")
     ax.set_ylabel("Band-integrated power (dB re V$^2$)", fontsize=20, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
