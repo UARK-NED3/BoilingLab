@@ -433,6 +433,36 @@ def save_heat_flux_power_plot(
     plt.close(fig)
 
 
+def save_boiling_curve_plot(
+    path: Path,
+    wall_temperature: np.ndarray,
+    heat_flux: np.ndarray,
+) -> None:
+    wall_temperature = np.asarray(wall_temperature, dtype=float)
+    heat_flux = np.asarray(heat_flux, dtype=float)
+    finite = np.isfinite(wall_temperature) & np.isfinite(heat_flux)
+    if not np.any(finite):
+        raise ValueError("No finite wall-temperature and heat-flux pairs found for boiling curve.")
+
+    fig, ax = plt.subplots(figsize=(8, 7))
+    ax.plot(
+        wall_temperature[finite],
+        heat_flux[finite],
+        color="tab:red",
+        linewidth=1.6,
+        linestyle="-",
+    )
+    ax.set_xlabel("Wall temperature, $T_{\\mathrm{w}}$ ($^\\circ$C)", fontsize=18, fontname="Arial")
+    ax.set_ylabel("Heat flux, $q''$ (W/cm$^2$)", fontsize=18, fontname="Arial")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True, right=True)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontname("Arial")
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
 def integrate_band_power(
     frequencies: np.ndarray,
     times: np.ndarray,
@@ -1525,6 +1555,11 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         dnb_time_s=dnb_time_s,
         peak_time_s=peak_time_s,
         off_time_s=shut_time,
+    )
+    save_boiling_curve_plot(
+        plots_dir / "boiling_curve.png",
+        surface_temperature,
+        heat_flux,
     )
 
     if not args.skip_sensors:

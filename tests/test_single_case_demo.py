@@ -17,6 +17,7 @@ from scripts.run_single_case_demo import (
     integrate_band_power,
     power_centroid_alignment,
     required_single_case_figure_paths,
+    save_boiling_curve_plot,
     save_characteristic_frequency_analysis,
     save_hydrophone_analysis,
     save_wfs_ae_spectrogram,
@@ -84,6 +85,21 @@ class CharacteristicFrequencyTests(unittest.TestCase):
         np.testing.assert_allclose(peak, [200.0, 300.0])
         np.testing.assert_allclose(centroid, [200.0, 275.0])
         np.testing.assert_allclose(bandwidth, [70.710678, 43.30127], rtol=1e-6)
+
+
+class BoilingCurvePlotTests(unittest.TestCase):
+    def test_saves_boiling_curve_plot(self):
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "boiling_curve.png"
+
+            save_boiling_curve_plot(
+                path,
+                wall_temperature=np.array([90.0, 100.0, 110.0]),
+                heat_flux=np.array([10.0, 25.0, 40.0]),
+            )
+
+            self.assertTrue(path.exists())
+            self.assertGreater(path.stat().st_size, 0)
 
 
 class DnbDetectionTests(unittest.TestCase):
