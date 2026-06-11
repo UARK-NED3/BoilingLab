@@ -79,12 +79,21 @@ Notebook marker values are reproduced for comparison. If the test log says CHF w
 | `meb_envelope_window_start_s` | `308.0000000000018` |
 | `meb_envelope_window_end_s` | `673.8934380000007` |
 | `meb_envelope_signals` | `wall_temperature, heat_flux, hydrophone_power` |
-| `meb_wall_temperature_envelope_percent_change` | `130.13284843371622` |
-| `meb_heat_flux_envelope_percent_change` | `120.35314809297346` |
-| `meb_hydrophone_power_envelope_percent_change` | `140.44599669808727` |
-| `meb_wall_temperature_envelope_r2` | `0.9001019993540071` |
-| `meb_heat_flux_envelope_r2` | `0.907453085246659` |
-| `meb_hydrophone_power_envelope_r2` | `0.5921942440724804` |
+| `meb_wall_temperature_envelope_percent_change` | `166.84305168321214` |
+| `meb_heat_flux_envelope_percent_change` | `149.69097123271857` |
+| `meb_hydrophone_power_envelope_percent_change` | `140.18607374925972` |
+| `meb_wall_temperature_envelope_r2` | `0.9349556334216645` |
+| `meb_heat_flux_envelope_r2` | `0.9383095992007896` |
+| `meb_hydrophone_power_envelope_r2` | `0.5881282986301506` |
+| `meb_wall_temperature_envelope_time_constant_s` | `239.09962791949064` |
+| `meb_heat_flux_envelope_time_constant_s` | `247.7554291015014` |
+| `meb_hydrophone_power_envelope_time_constant_s` | `7308.800000922937` |
+| `meb_wall_temperature_envelope_asymptote` | `18.825831935684818` |
+| `meb_heat_flux_envelope_asymptote` | `41.5450051157567` |
+| `meb_hydrophone_power_envelope_asymptote` | `0.43797216433723973` |
+| `meb_wall_temperature_envelope_saturation_fraction_at_end` | `0.7833534274278658` |
+| `meb_heat_flux_envelope_saturation_fraction_at_end` | `0.7714619169713107` |
+| `meb_hydrophone_power_envelope_saturation_fraction_at_end` | `0.04877057549928598` |
 | `ae_hit_available` | `True` |
 | `ae_time_available` | `True` |
 | `ae_hit_rows` | `61864` |

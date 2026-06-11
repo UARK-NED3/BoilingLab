@@ -158,7 +158,8 @@ class BandPowerOscillationTests(unittest.TestCase):
 class OscillationEnvelopeGrowthTests(unittest.TestCase):
     def test_detects_growing_oscillation_envelope(self):
         time = np.arange(300.0, 700.0, 0.4)
-        amplitude = 1.0 + 0.003 * (time - 300.0)
+        elapsed = time - time[0]
+        amplitude = 1.0 + 1.6 * (1.0 - np.exp(-elapsed / 90.0))
         signal = 20.0 + amplitude * np.sin(2 * np.pi * 0.08 * time)
 
         envelope, metrics = oscillation_envelope_growth(
@@ -169,8 +170,12 @@ class OscillationEnvelopeGrowthTests(unittest.TestCase):
         )
 
         self.assertEqual(len(envelope), metrics["sample_count"])
-        self.assertGreater(metrics["envelope_slope_per_s"], 0.0)
-        self.assertGreater(metrics["envelope_fit_percent_change"], 50.0)
+        self.assertIn("Asymptotic envelope fit", envelope)
+        self.assertGreater(metrics["envelope_asymptotic_growth"], 1.0)
+        self.assertGreater(metrics["envelope_fit_percent_change"], 80.0)
+        self.assertAlmostEqual(metrics["envelope_time_constant_s"], 90.0, delta=35.0)
+        self.assertGreater(metrics["envelope_saturation_fraction_at_end"], 0.90)
+        self.assertGreater(metrics["envelope_r2"], 0.90)
 
     def test_finds_first_peak_after_nominal_start(self):
         time = np.arange(295.0, 360.0, 0.1)

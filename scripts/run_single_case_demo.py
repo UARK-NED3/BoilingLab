@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pyXSteam.XSteam import XSteam
+from scipy.optimize import curve_fit
 from scipy.signal import correlate, correlation_lags, detrend, find_peaks, get_window, hilbert, savgol_filter, spectrogram, welch
 from scipy.stats import linregress
 import matplotlib.ticker as mticker
@@ -925,6 +926,84 @@ def smooth_with_savgol(values: np.ndarray, sample_spacing_s: float, window_s: fl
     return savgol_filter(values, window_length=window, polyorder=polyorder, mode="interp")
 
 
+def asymptotic_growth_model(elapsed_s: np.ndarray, initial: float, growth: float, tau_s: float) -> np.ndarray:
+    return initial + growth * (1.0 - np.exp(-elapsed_s / tau_s))
+
+
+def fit_asymptotic_envelope(
+    time_s: np.ndarray,
+    envelope: np.ndarray,
+    sample_spacing_s: float,
+) -> tuple[np.ndarray, dict[str, float]]:
+    elapsed_s = np.asarray(time_s, dtype=float) - float(time_s[0])
+    envelope = np.asarray(envelope, dtype=float)
+    finite = np.isfinite(elapsed_s) & np.isfinite(envelope)
+    if np.count_nonzero(finite) < 10:
+        raise ValueError("At least 10 finite envelope samples are required for asymptotic fitting.")
+
+    fit_elapsed = elapsed_s[finite]
+    fit_envelope = envelope[finite]
+    duration_s = float(fit_elapsed[-1] - fit_elapsed[0])
+    if duration_s <= 0:
+        raise ValueError("Asymptotic fitting requires a positive time window.")
+
+    head_count = max(5, len(fit_envelope) // 10)
+    tail_count = max(5, len(fit_envelope) // 10)
+    initial_guess = float(np.nanmedian(fit_envelope[:head_count]))
+    end_guess = float(np.nanmedian(fit_envelope[-tail_count:]))
+    envelope_range = float(np.nanmax(fit_envelope) - np.nanmin(fit_envelope))
+    growth_guess = max(end_guess - initial_guess, 0.2 * envelope_range, np.finfo(float).eps)
+    tau_guess = max(duration_s / 3.0, sample_spacing_s)
+    upper_scale = max(float(np.nanmax(fit_envelope)), initial_guess + growth_guess, np.finfo(float).eps)
+
+    lower_bounds = (0.0, 0.0, max(sample_spacing_s, np.finfo(float).eps))
+    upper_bounds = (upper_scale * 5.0, upper_scale * 20.0, max(duration_s * 20.0, sample_spacing_s * 2.0))
+    try:
+        params, _ = curve_fit(
+            asymptotic_growth_model,
+            fit_elapsed,
+            fit_envelope,
+            p0=(max(initial_guess, 0.0), growth_guess, tau_guess),
+            bounds=(lower_bounds, upper_bounds),
+            maxfev=50000,
+        )
+    except (RuntimeError, ValueError):
+        params = np.array([initial_guess, growth_guess, tau_guess], dtype=float)
+
+    initial, growth, tau_s = (float(value) for value in params)
+    fit = asymptotic_growth_model(elapsed_s, initial, growth, tau_s)
+    fitted_start = float(asymptotic_growth_model(np.array([0.0]), initial, growth, tau_s)[0])
+    fitted_end = float(asymptotic_growth_model(np.array([duration_s]), initial, growth, tau_s)[0])
+    asymptote = initial + growth
+    residual = fit_envelope - asymptotic_growth_model(fit_elapsed, initial, growth, tau_s)
+    ss_res = float(np.nansum(residual**2))
+    ss_tot = float(np.nansum((fit_envelope - np.nanmean(fit_envelope)) ** 2))
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > np.finfo(float).eps else np.nan
+    percent_change = (
+        100.0 * (fitted_end - fitted_start) / abs(fitted_start)
+        if np.isfinite(fitted_start) and abs(fitted_start) > np.finfo(float).eps
+        else np.nan
+    )
+    saturation_fraction = (
+        (fitted_end - initial) / growth
+        if np.isfinite(growth) and growth > np.finfo(float).eps
+        else np.nan
+    )
+    time_to_95_s = float(time_s[0] - tau_s * np.log(0.05)) if growth > np.finfo(float).eps else np.nan
+    return fit, {
+        "envelope_fit_start": fitted_start,
+        "envelope_fit_end": fitted_end,
+        "envelope_fit_percent_change": float(percent_change),
+        "envelope_asymptotic_initial": initial,
+        "envelope_asymptotic_growth": growth,
+        "envelope_asymptote": asymptote,
+        "envelope_time_constant_s": tau_s,
+        "envelope_time_to_95_percent_s": time_to_95_s,
+        "envelope_saturation_fraction_at_end": float(saturation_fraction),
+        "envelope_r2": float(r2),
+    }
+
+
 def oscillation_envelope_growth(
     time_s: np.ndarray,
     signal: np.ndarray,
@@ -965,19 +1044,22 @@ def oscillation_envelope_growth(
     smoothed_envelope = smooth_with_savgol(envelope, sample_spacing_s, envelope_smooth_window_s)
 
     regression = linregress(uniform_time, smoothed_envelope)
-    fit = regression.intercept + regression.slope * uniform_time
-    fitted_start = regression.intercept + regression.slope * window_start_s
-    fitted_end = regression.intercept + regression.slope * window_end_s
-    percent_change = (
-        100.0 * (fitted_end - fitted_start) / abs(fitted_start)
-        if np.isfinite(fitted_start) and abs(fitted_start) > np.finfo(float).eps
-        else np.nan
+    linear_fit = regression.intercept + regression.slope * uniform_time
+    asymptotic_fit, asymptotic_metrics = fit_asymptotic_envelope(
+        uniform_time,
+        smoothed_envelope,
+        sample_spacing_s=sample_spacing_s,
     )
     normalization = np.nanmedian(smoothed_envelope[: max(5, len(smoothed_envelope) // 10)])
     normalized_envelope = (
         smoothed_envelope / normalization
         if np.isfinite(normalization) and abs(normalization) > np.finfo(float).eps
         else np.full_like(smoothed_envelope, np.nan)
+    )
+    normalized_asymptotic_fit = (
+        asymptotic_fit / normalization
+        if np.isfinite(normalization) and abs(normalization) > np.finfo(float).eps
+        else np.full_like(asymptotic_fit, np.nan)
     )
 
     envelope_df = pd.DataFrame(
@@ -987,8 +1069,11 @@ def oscillation_envelope_growth(
             "Baseline": baseline,
             "Detrended signal": detrended_signal,
             "Envelope": smoothed_envelope,
-            "Envelope fit": fit,
+            "Envelope fit": asymptotic_fit,
+            "Asymptotic envelope fit": asymptotic_fit,
+            "Linear envelope fit": linear_fit,
             "Normalized envelope": normalized_envelope,
+            "Normalized asymptotic envelope fit": normalized_asymptotic_fit,
         }
     )
     metrics = {
@@ -1000,12 +1085,10 @@ def oscillation_envelope_growth(
         "envelope_smooth_window_s": float(envelope_smooth_window_s),
         "envelope_slope_per_s": float(regression.slope),
         "envelope_intercept": float(regression.intercept),
-        "envelope_r2": float(regression.rvalue**2),
+        "envelope_linear_r2": float(regression.rvalue**2),
         "envelope_p_value": float(regression.pvalue),
-        "envelope_fit_start": float(fitted_start),
-        "envelope_fit_end": float(fitted_end),
-        "envelope_fit_percent_change": float(percent_change),
         "envelope_normalization": float(normalization),
+        **asymptotic_metrics,
     }
     return envelope_df, metrics
 
@@ -1120,11 +1203,16 @@ def save_meb_envelope_analysis(
         ax.plot(frame["Time (s)"], frame["Detrended signal"], color="0.45", linewidth=0.9, label="Detrended")
         ax.plot(frame["Time (s)"], frame["Envelope"], color=row["Color"], linewidth=2.0, label="Envelope")
         ax.plot(frame["Time (s)"], -frame["Envelope"], color=row["Color"], linewidth=1.2, alpha=0.65)
-        ax.plot(frame["Time (s)"], frame["Envelope fit"], color="black", linestyle="--", linewidth=1.5)
+        ax.plot(frame["Time (s)"], frame["Asymptotic envelope fit"], color="black", linestyle="--", linewidth=1.5)
+        observed_envelope_max = float(np.nanmax(frame["Envelope"]))
+        if row["envelope_asymptote"] <= 1.25 * observed_envelope_max:
+            ax.axhline(row["envelope_asymptote"], color="black", linestyle=":", linewidth=1.2, alpha=0.7)
         ax.text(
             0.02,
             0.90,
             f"{row['Signal label']}: {row['envelope_fit_percent_change']:.1f}% change, "
+            f"$\\tau$={row['envelope_time_constant_s']:.1f} s, "
+            f"sat.={100.0 * row['envelope_saturation_fraction_at_end']:.0f}%, "
             f"R$^2$={row['envelope_r2']:.2f}",
             transform=ax.transAxes,
             va="top",
@@ -1146,7 +1234,7 @@ def save_meb_envelope_analysis(
     for row in metrics_rows:
         frame = all_envelopes[all_envelopes["Signal key"] == row["Signal key"]]
         normalized_fit = (
-            frame["Envelope fit"] / row["envelope_normalization"]
+            frame["Asymptotic envelope fit"] / row["envelope_normalization"]
             if row["envelope_normalization"]
             else np.nan
         )
@@ -1155,7 +1243,7 @@ def save_meb_envelope_analysis(
             frame["Normalized envelope"],
             color=row["Color"],
             linewidth=2.1,
-            label=f"{row['Signal label']} ({row['envelope_fit_percent_change']:.0f}%)",
+            label=f"{row['Signal label']} ($\\tau$={row['envelope_time_constant_s']:.0f} s)",
         )
         ax.plot(frame["Time (s)"], normalized_fit, color=row["Color"], linestyle="--", linewidth=1.3)
     ax.set_xlim(window_start_s, window_end_s)
@@ -1180,6 +1268,14 @@ def save_meb_envelope_analysis(
             for row in metrics_rows
         },
         **{f"meb_{row['Signal key']}_envelope_r2": float(row["envelope_r2"]) for row in metrics_rows},
+        **{f"meb_{row['Signal key']}_envelope_time_constant_s": float(row["envelope_time_constant_s"]) for row in metrics_rows},
+        **{f"meb_{row['Signal key']}_envelope_asymptote": float(row["envelope_asymptote"]) for row in metrics_rows},
+        **{
+            f"meb_{row['Signal key']}_envelope_saturation_fraction_at_end": float(
+                row["envelope_saturation_fraction_at_end"]
+            )
+            for row in metrics_rows
+        },
     }
 
 

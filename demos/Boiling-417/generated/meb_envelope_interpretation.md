@@ -2,10 +2,11 @@
 
 ## Scope
 
-This analysis quantifies whether the oscillation amplitude increases during the
-active-heating MEB interval. The requested window was `300-700 s`, but Boiling-417
-power shuts off at `t_off = 673.893 s`; therefore the fitted MEB envelope window is
-`300.0-673.893 s`.
+This analysis quantifies whether the oscillation amplitude increases and begins
+to saturate during the active-heating MEB interval. The requested window was
+`300-700 s`, but Boiling-417 power shuts off at `t_off = 673.893 s`; therefore
+the fitted MEB envelope window is `308.0-673.893 s`, starting at the first
+thermal oscillation peak `t_osc`.
 
 Signals analyzed:
 
@@ -22,31 +23,44 @@ For each signal, the runner:
 2. Removes a slow baseline using a 75 s Savitzky-Golay smoother.
 3. Computes a Hilbert-transform envelope of the detrended oscillatory component.
 4. Smooths the envelope with a 35 s Savitzky-Golay smoother.
-5. Fits a linear trend to the envelope and reports the fitted percent change.
+5. Fits a first-order asymptotic growth model,
+   `A(t) = A_inf - (A_inf - A_0) exp(-(t - t_osc) / tau)`, to the smoothed
+   envelope and reports the fitted percent change, time constant `tau`, and
+   saturation fraction at the end of the window.
 
 The complete per-time envelope data are in `meb_envelope_analysis.csv`; the
 growth metrics are in `meb_envelope_metrics.csv`.
 
 ## Results
 
-| Signal | Fitted envelope start | Fitted envelope end | Percent change | R2 |
-| --- | ---: | ---: | ---: | ---: |
-| `T_w` | `6.977 C` | `17.217 C` | `146.8%` | `0.896` |
-| `q''` | `15.972 W/cm^2` | `37.725 W/cm^2` | `136.2%` | `0.900` |
-| Hydrophone power | `1.431e-2 V^2` | `3.551e-2 V^2` | `148.2%` | `0.606` |
+| Signal | Fitted envelope start | Fitted envelope end | Percent change | `tau` | Saturation | R2 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `T_w` | `6.015 C` | `16.050 C` | `166.8%` | `239.1 s` | `78%` | `0.935` |
+| `q''` | `14.129 W/cm^2` | `35.279 W/cm^2` | `149.7%` | `247.8 s` | `77%` | `0.938` |
+| Hydrophone power | `1.472e-2 V^2` | `3.537e-2 V^2` | `140.2%` | `7308.8 s` | `5%` | `0.588` |
 
-The temperature and heat-flux envelopes show a strong monotonic increase over
-the active MEB interval. The hydrophone-power envelope also increases strongly,
-but with more intermittent bursts, so the linear trend has a lower R2.
+The temperature and heat-flux envelopes show a strong increase that is already
+slowing by shutoff. Their fitted saturation fractions are about 77-78%, so the
+thermal oscillation amplitude is moving toward a quasi-steady MEB envelope but
+has not fully saturated before power is turned off. The hydrophone-power
+envelope increases, but the fitted `tau` is much longer than the observation
+window and the R2 is lower; this indicates that a single asymptotic growth curve
+is a weak description of the acoustic power envelope, likely because it contains
+intermittent burst-like structure in addition to the MEB oscillation amplitude.
 
 ## Physical Interpretation
 
 The synchronized growth in thermal and acoustic envelopes suggests that the
-MEB oscillation is becoming more energetic over time while power remains on. A
-plausible mechanism is progressive strengthening and spatial synchronization of
-the vapor-bubble growth/collapse cycle. As the vapor structure oscillates more
-violently, it can produce larger wall-temperature and heat-flux excursions and
-larger pressure/acoustic emission during collapses.
+MEB oscillation is becoming more energetic over time while power remains on, but
+the asymptotic fit suggests the thermal response is approaching a finite
+oscillation amplitude. A plausible mechanism is progressive strengthening and
+spatial synchronization of the vapor-bubble growth/collapse cycle until the
+near-wall liquid replenishment, condensation rate, vapor generation rate, and
+applied heat input approach a dynamic balance. As the vapor structure oscillates
+more violently, it can produce larger wall-temperature and heat-flux excursions
+and larger pressure/acoustic emission during collapses. The acoustic power need
+not saturate on the same time scale because it is more sensitive to intermittent
+collapse intensity and sensor-band coupling.
 
 This interpretation is consistent with published MEB observations that connect
 MEB heat transfer to oscillating vapor bubbles, oscillating liquid flow, pressure
