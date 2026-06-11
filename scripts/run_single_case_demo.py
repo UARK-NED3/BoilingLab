@@ -987,6 +987,43 @@ def oscillation_envelope_growth(
     return envelope_df, metrics
 
 
+def first_oscillation_peak_time(
+    time_s: np.ndarray,
+    signal: np.ndarray,
+    search_start_s: float,
+    search_end_s: float,
+    baseline_window_s: float = 75.0,
+) -> float:
+    time_s = np.asarray(time_s, dtype=float)
+    signal = np.asarray(signal, dtype=float)
+    finite = np.isfinite(time_s) & np.isfinite(signal)
+    selected = finite & (time_s >= search_start_s) & (time_s <= search_end_s)
+    if np.count_nonzero(selected) < 20:
+        return float(search_start_s)
+
+    selected_time = time_s[selected]
+    selected_signal = signal[selected]
+    order = np.argsort(selected_time)
+    selected_time = selected_time[order]
+    selected_signal = selected_signal[order]
+    unique_time, unique_index = np.unique(selected_time, return_index=True)
+    selected_signal = selected_signal[unique_index]
+    sample_spacing_s = float(np.nanmedian(np.diff(unique_time)))
+    if not np.isfinite(sample_spacing_s) or sample_spacing_s <= 0:
+        return float(search_start_s)
+
+    uniform_time = np.arange(unique_time[0], unique_time[-1] + 0.5 * sample_spacing_s, sample_spacing_s)
+    uniform_signal = np.interp(uniform_time, unique_time, selected_signal)
+    baseline = smooth_with_savgol(uniform_signal, sample_spacing_s, baseline_window_s)
+    detrended_signal = uniform_signal - baseline
+    peak_distance = max(1, int(round(5.0 / sample_spacing_s)))
+    prominence = max(np.nanstd(detrended_signal) * 0.2, np.finfo(float).eps)
+    peak_indices, _ = find_peaks(detrended_signal, distance=peak_distance, prominence=prominence)
+    if not len(peak_indices):
+        return float(search_start_s)
+    return float(uniform_time[peak_indices[0]])
+
+
 def save_meb_envelope_analysis(
     test_id: str,
     output_dir: Path,
@@ -1002,6 +1039,13 @@ def save_meb_envelope_analysis(
 ) -> dict[str, object]:
     if off_time_s is not None and window_start_s < off_time_s < window_end_s:
         window_end_s = off_time_s
+    requested_window_start_s = float(window_start_s)
+    window_start_s = first_oscillation_peak_time(
+        wall_time_s,
+        wall_temperature_c,
+        search_start_s=requested_window_start_s,
+        search_end_s=window_end_s,
+    )
 
     signal_specs = [
         ("wall_temperature", r"$T_{\mathrm{w}}$", "Wall temperature (C)", wall_time_s, wall_temperature_c, "tab:purple"),
@@ -1104,6 +1148,7 @@ def save_meb_envelope_analysis(
     plt.close(fig)
 
     return {
+        "meb_envelope_requested_window_start_s": requested_window_start_s,
         "meb_envelope_window_start_s": float(window_start_s),
         "meb_envelope_window_end_s": float(window_end_s),
         "meb_envelope_signals": ", ".join(row["Signal key"] for row in metrics_rows),

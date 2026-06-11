@@ -14,6 +14,7 @@ from scripts.run_single_case_demo import (
     default_output_dir,
     detect_dnb_time,
     detect_wall_temperature_peak_time,
+    first_oscillation_peak_time,
     integrate_band_power,
     oscillation_envelope_growth,
     power_centroid_alignment,
@@ -170,6 +171,20 @@ class OscillationEnvelopeGrowthTests(unittest.TestCase):
         self.assertEqual(len(envelope), metrics["sample_count"])
         self.assertGreater(metrics["envelope_slope_per_s"], 0.0)
         self.assertGreater(metrics["envelope_fit_percent_change"], 50.0)
+
+    def test_finds_first_peak_after_nominal_start(self):
+        time = np.arange(295.0, 360.0, 0.1)
+        signal = np.sin(2 * np.pi * 0.1 * (time - 302.5))
+
+        peak_time = first_oscillation_peak_time(
+            time,
+            signal,
+            search_start_s=300.0,
+            search_end_s=360.0,
+            baseline_window_s=20.0,
+        )
+
+        self.assertAlmostEqual(peak_time, 305.0, delta=0.5)
 
 
 class PowerCentroidAlignmentTests(unittest.TestCase):
