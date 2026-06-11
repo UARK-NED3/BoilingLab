@@ -42,6 +42,9 @@ Notebook marker values are reproduced for comparison. If the test log says CHF w
 | `surface_temp_at_dc_start_C` | `67.32582513799997` |
 | `dc_shutoff_time_s` | `673.8934380000007` |
 | `surface_temp_at_dc_shutoff_C` | `130.90226886200003` |
+| `oscillation_peak_time_s` | `308.0000000000018` |
+| `oscillation_peak_search_start_s` | `300.0` |
+| `oscillation_peak_search_end_s` | `673.8934380000007` |
 | `hydrophone_available` | `True` |
 | `hydrophone_rows` | `12659200` |
 | `hydrophone_sampling_frequency_Hz` | `12799.999998382205` |
@@ -72,6 +75,16 @@ Notebook marker values are reproduced for comparison. If the test log says CHF w
 | `hydrophone_dominant_oscillation_frequency_Hz` | `0.07999999998989779` |
 | `hydrophone_dominant_oscillation_period_s` | `12.50000000157847` |
 | `hydrophone_oscillation_label` | `Hydrophone` |
+| `meb_envelope_requested_window_start_s` | `300.0` |
+| `meb_envelope_window_start_s` | `308.0000000000018` |
+| `meb_envelope_window_end_s` | `673.8934380000007` |
+| `meb_envelope_signals` | `wall_temperature, heat_flux, hydrophone_power` |
+| `meb_wall_temperature_envelope_percent_change` | `130.13284843371622` |
+| `meb_heat_flux_envelope_percent_change` | `120.35314809297346` |
+| `meb_hydrophone_power_envelope_percent_change` | `140.44599669808727` |
+| `meb_wall_temperature_envelope_r2` | `0.9001019993540071` |
+| `meb_heat_flux_envelope_r2` | `0.907453085246659` |
+| `meb_hydrophone_power_envelope_r2` | `0.5921942440724804` |
 | `ae_hit_available` | `True` |
 | `ae_time_available` | `True` |
 | `ae_hit_rows` | `61864` |

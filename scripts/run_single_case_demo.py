@@ -261,6 +261,7 @@ def add_event_markers(
     ax: plt.Axes,
     dnb_time_s: float | None = None,
     peak_time_s: float | None = None,
+    osc_time_s: float | None = None,
     off_time_s: float | None = None,
 ) -> None:
     ymin, ymax = ax.get_ylim()
@@ -292,6 +293,19 @@ def add_event_markers(
             fontname="Arial",
             color="tab:red",
         )
+    if osc_time_s is not None:
+        ax.axvline(osc_time_s, color="tab:green", linestyle="--", linewidth=1.4)
+        ax.text(
+            osc_time_s,
+            lower_label_y,
+            r"$t_{\mathrm{osc}}$",
+            rotation=90,
+            va="bottom",
+            ha="left",
+            fontsize=13,
+            fontname="Arial",
+            color="tab:green",
+        )
     if off_time_s is not None:
         ax.axvline(off_time_s, color="0.35", linestyle="--", linewidth=1.3)
         ax.text(
@@ -315,6 +329,7 @@ def save_temperature_profile_plot(
     title: str,
     dnb_time_s: float | None = None,
     peak_time_s: float | None = None,
+    osc_time_s: float | None = None,
     off_time_s: float | None = None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(14, 6))
@@ -342,7 +357,13 @@ def save_temperature_profile_plot(
     ax.set_xlabel("Time, $t$ (s)", fontsize=18, fontname="Arial")
     ax.set_ylabel("Temperature, $T$ ($^\\circ$C)", fontsize=18, fontname="Arial")
     ax.grid(True, linestyle="--", alpha=0.4)
-    add_event_markers(ax, dnb_time_s=dnb_time_s, peak_time_s=peak_time_s, off_time_s=off_time_s)
+    add_event_markers(
+        ax,
+        dnb_time_s=dnb_time_s,
+        peak_time_s=peak_time_s,
+        osc_time_s=osc_time_s,
+        off_time_s=off_time_s,
+    )
     ax.tick_params(axis="both", which="major", labelsize=15, direction="in", top=True, right=True)
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontname("Arial")
@@ -361,6 +382,7 @@ def save_heat_flux_power_plot(
     title: str,
     dnb_time_s: float | None = None,
     peak_time_s: float | None = None,
+    osc_time_s: float | None = None,
     off_time_s: float | None = None,
 ) -> None:
     fig, ax_heat_flux = plt.subplots(figsize=(14, 6))
@@ -382,6 +404,7 @@ def save_heat_flux_power_plot(
         ax_heat_flux,
         dnb_time_s=dnb_time_s,
         peak_time_s=peak_time_s,
+        osc_time_s=osc_time_s,
         off_time_s=off_time_s,
     )
     ax_heat_flux.tick_params(
@@ -1835,6 +1858,23 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
             "tab:orange",
         )
 
+    osc_window_end_s = float(args.oscillation_end_s)
+    if shut_time is not None and args.oscillation_start_s < shut_time < osc_window_end_s:
+        osc_window_end_s = shut_time
+    osc_time_s = first_oscillation_peak_time(
+        time_s,
+        surface_temperature,
+        search_start_s=float(args.oscillation_start_s),
+        search_end_s=osc_window_end_s,
+    )
+    summary.update(
+        {
+            "oscillation_peak_time_s": osc_time_s,
+            "oscillation_peak_search_start_s": float(args.oscillation_start_s),
+            "oscillation_peak_search_end_s": osc_window_end_s,
+        }
+    )
+
     save_line_plot(
         plots_dir / "pressure_profile.png",
         pressure_df["Time (sec)"].to_numpy(dtype=float),
@@ -1853,6 +1893,7 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         f"{test_id} Heat Flux vs Time",
         dnb_time_s=dnb_time_s,
         peak_time_s=peak_time_s,
+        osc_time_s=osc_time_s,
         off_time_s=shut_time,
     )
     save_temperature_profile_plot(
@@ -1863,6 +1904,7 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         f"{test_id} Temperature vs Time",
         dnb_time_s=dnb_time_s,
         peak_time_s=peak_time_s,
+        osc_time_s=osc_time_s,
         off_time_s=shut_time,
     )
     save_boiling_curve_plot(

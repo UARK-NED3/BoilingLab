@@ -220,6 +220,19 @@ class AcousticEventMarkerPlotTests(unittest.TestCase):
         finally:
             plt.close(fig)
 
+    def test_oscillation_event_label_is_added(self):
+        fig, ax = plt.subplots()
+        try:
+            ax.plot([0.0, 1.0], [0.0, 1.0])
+
+            add_event_markers(ax, osc_time_s=0.5)
+
+            osc_labels = [text for text in ax.texts if "osc" in text.get_text()]
+            self.assertEqual(len(osc_labels), 1)
+            self.assertEqual(osc_labels[0].get_ha(), "left")
+        finally:
+            plt.close(fig)
+
     def test_characteristic_frequency_plot_adds_event_markers(self):
         times = np.linspace(0.0, 4.0, 5)
         frequencies = np.array([0.0, 1000.0, 2000.0])
