@@ -15,6 +15,7 @@ from scripts.run_single_case_demo import (
     detect_dnb_time,
     detect_wall_temperature_peak_time,
     integrate_band_power,
+    oscillation_envelope_growth,
     power_centroid_alignment,
     required_single_case_figure_paths,
     save_boiling_curve_plot,
@@ -151,6 +152,24 @@ class BandPowerOscillationTests(unittest.TestCase):
         self.assertEqual(n_samples, len(time))
         self.assertAlmostEqual(dominant_frequency, 0.08, places=2)
         self.assertAlmostEqual(dominant_period, 12.5, places=1)
+
+
+class OscillationEnvelopeGrowthTests(unittest.TestCase):
+    def test_detects_growing_oscillation_envelope(self):
+        time = np.arange(300.0, 700.0, 0.4)
+        amplitude = 1.0 + 0.003 * (time - 300.0)
+        signal = 20.0 + amplitude * np.sin(2 * np.pi * 0.08 * time)
+
+        envelope, metrics = oscillation_envelope_growth(
+            time,
+            signal,
+            window_start_s=300.0,
+            window_end_s=700.0,
+        )
+
+        self.assertEqual(len(envelope), metrics["sample_count"])
+        self.assertGreater(metrics["envelope_slope_per_s"], 0.0)
+        self.assertGreater(metrics["envelope_fit_percent_change"], 50.0)
 
 
 class PowerCentroidAlignmentTests(unittest.TestCase):

@@ -21,7 +21,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pyXSteam.XSteam import XSteam
-from scipy.signal import correlate, correlation_lags, detrend, find_peaks, get_window, spectrogram, welch
+from scipy.signal import correlate, correlation_lags, detrend, find_peaks, get_window, hilbert, savgol_filter, spectrogram, welch
+from scipy.stats import linregress
 import matplotlib.ticker as mticker
 
 
@@ -880,6 +881,240 @@ def save_band_power_oscillation_analysis(
     }
 
 
+def odd_window_length(window_s: float, sample_spacing_s: float, n_samples: int) -> int:
+    if n_samples < 5 or sample_spacing_s <= 0:
+        return 0
+    window = max(5, int(round(window_s / sample_spacing_s)))
+    if window % 2 == 0:
+        window += 1
+    if window >= n_samples:
+        window = n_samples - 1 if n_samples % 2 == 0 else n_samples
+    if window % 2 == 0:
+        window -= 1
+    return max(0, window)
+
+
+def smooth_with_savgol(values: np.ndarray, sample_spacing_s: float, window_s: float) -> np.ndarray:
+    window = odd_window_length(window_s, sample_spacing_s, len(values))
+    if window < 5:
+        return values.copy()
+    polyorder = min(2, window - 1)
+    return savgol_filter(values, window_length=window, polyorder=polyorder, mode="interp")
+
+
+def oscillation_envelope_growth(
+    time_s: np.ndarray,
+    signal: np.ndarray,
+    window_start_s: float,
+    window_end_s: float,
+    baseline_window_s: float = 75.0,
+    envelope_smooth_window_s: float = 35.0,
+) -> tuple[pd.DataFrame, dict[str, float]]:
+    time_s = np.asarray(time_s, dtype=float)
+    signal = np.asarray(signal, dtype=float)
+    finite = np.isfinite(time_s) & np.isfinite(signal)
+    selected = finite & (time_s >= window_start_s) & (time_s <= window_end_s)
+    if np.count_nonzero(selected) < 20:
+        raise ValueError("At least 20 finite samples are required for envelope analysis.")
+
+    selected_time = time_s[selected]
+    selected_signal = signal[selected]
+    order = np.argsort(selected_time)
+    selected_time = selected_time[order]
+    selected_signal = selected_signal[order]
+
+    unique_time, unique_index = np.unique(selected_time, return_index=True)
+    selected_signal = selected_signal[unique_index]
+    sample_spacing_s = float(np.nanmedian(np.diff(unique_time)))
+    if not np.isfinite(sample_spacing_s) or sample_spacing_s <= 0:
+        raise ValueError("Envelope analysis requires monotonically increasing time samples.")
+
+    uniform_time = np.arange(unique_time[0], unique_time[-1] + 0.5 * sample_spacing_s, sample_spacing_s)
+    uniform_signal = np.interp(uniform_time, unique_time, selected_signal)
+    baseline = smooth_with_savgol(uniform_signal, sample_spacing_s, baseline_window_s)
+    detrended_signal = uniform_signal - baseline
+    pad_width = min(len(detrended_signal) - 1, max(10, odd_window_length(baseline_window_s, sample_spacing_s, len(detrended_signal))))
+    if pad_width > 1:
+        padded_signal = np.pad(detrended_signal, pad_width=pad_width, mode="reflect")
+        envelope = np.abs(hilbert(padded_signal))[pad_width:-pad_width]
+    else:
+        envelope = np.abs(hilbert(detrended_signal))
+    smoothed_envelope = smooth_with_savgol(envelope, sample_spacing_s, envelope_smooth_window_s)
+
+    regression = linregress(uniform_time, smoothed_envelope)
+    fit = regression.intercept + regression.slope * uniform_time
+    fitted_start = regression.intercept + regression.slope * window_start_s
+    fitted_end = regression.intercept + regression.slope * window_end_s
+    percent_change = (
+        100.0 * (fitted_end - fitted_start) / abs(fitted_start)
+        if np.isfinite(fitted_start) and abs(fitted_start) > np.finfo(float).eps
+        else np.nan
+    )
+    normalization = np.nanmedian(smoothed_envelope[: max(5, len(smoothed_envelope) // 10)])
+    normalized_envelope = (
+        smoothed_envelope / normalization
+        if np.isfinite(normalization) and abs(normalization) > np.finfo(float).eps
+        else np.full_like(smoothed_envelope, np.nan)
+    )
+
+    envelope_df = pd.DataFrame(
+        {
+            "Time (s)": uniform_time,
+            "Signal": uniform_signal,
+            "Baseline": baseline,
+            "Detrended signal": detrended_signal,
+            "Envelope": smoothed_envelope,
+            "Envelope fit": fit,
+            "Normalized envelope": normalized_envelope,
+        }
+    )
+    metrics = {
+        "window_start_s": float(window_start_s),
+        "window_end_s": float(window_end_s),
+        "sample_count": int(len(uniform_time)),
+        "sample_spacing_s": sample_spacing_s,
+        "baseline_window_s": float(baseline_window_s),
+        "envelope_smooth_window_s": float(envelope_smooth_window_s),
+        "envelope_slope_per_s": float(regression.slope),
+        "envelope_intercept": float(regression.intercept),
+        "envelope_r2": float(regression.rvalue**2),
+        "envelope_p_value": float(regression.pvalue),
+        "envelope_fit_start": float(fitted_start),
+        "envelope_fit_end": float(fitted_end),
+        "envelope_fit_percent_change": float(percent_change),
+        "envelope_normalization": float(normalization),
+    }
+    return envelope_df, metrics
+
+
+def save_meb_envelope_analysis(
+    test_id: str,
+    output_dir: Path,
+    plots_dir: Path,
+    wall_time_s: np.ndarray,
+    wall_temperature_c: np.ndarray,
+    heat_flux_w_cm2: np.ndarray,
+    hydrophone_time_s: np.ndarray | None,
+    hydrophone_power_v2: np.ndarray | None,
+    window_start_s: float,
+    window_end_s: float,
+    off_time_s: float | None = None,
+) -> dict[str, object]:
+    if off_time_s is not None and window_start_s < off_time_s < window_end_s:
+        window_end_s = off_time_s
+
+    signal_specs = [
+        ("wall_temperature", r"$T_{\mathrm{w}}$", "Wall temperature (C)", wall_time_s, wall_temperature_c, "tab:purple"),
+        ("heat_flux", r"$q''$", "Heat flux (W/cm$^2$)", wall_time_s, heat_flux_w_cm2, "tab:red"),
+    ]
+    if hydrophone_time_s is not None and hydrophone_power_v2 is not None:
+        signal_specs.append(
+            (
+                "hydrophone_power",
+                "Hydrophone power",
+                "Band-integrated power (V$^2$)",
+                hydrophone_time_s,
+                hydrophone_power_v2,
+                "tab:blue",
+            )
+        )
+
+    envelope_frames = []
+    metrics_rows = []
+    for key, label, ylabel, signal_time, signal_values, color in signal_specs:
+        envelope_df, metrics = oscillation_envelope_growth(
+            signal_time,
+            signal_values,
+            window_start_s=window_start_s,
+            window_end_s=window_end_s,
+        )
+        envelope_df.insert(0, "Signal key", key)
+        envelope_df.insert(1, "Signal label", label)
+        envelope_frames.append(envelope_df)
+        metrics_rows.append(
+            {
+                "Signal key": key,
+                "Signal label": label,
+                "Y label": ylabel,
+                "Color": color,
+                **metrics,
+            }
+        )
+
+    all_envelopes = pd.concat(envelope_frames, ignore_index=True)
+    metrics_df = pd.DataFrame(metrics_rows)
+    all_envelopes.to_csv(output_dir / "meb_envelope_analysis.csv", index=False)
+    metrics_df.to_csv(output_dir / "meb_envelope_metrics.csv", index=False)
+
+    fig, axes = plt.subplots(len(metrics_rows), 1, figsize=(13, 3.8 * len(metrics_rows)), sharex=True)
+    axes = np.atleast_1d(axes)
+    for ax, row in zip(axes, metrics_rows):
+        frame = all_envelopes[all_envelopes["Signal key"] == row["Signal key"]]
+        ax.plot(frame["Time (s)"], frame["Detrended signal"], color="0.45", linewidth=0.9, label="Detrended")
+        ax.plot(frame["Time (s)"], frame["Envelope"], color=row["Color"], linewidth=2.0, label="Envelope")
+        ax.plot(frame["Time (s)"], -frame["Envelope"], color=row["Color"], linewidth=1.2, alpha=0.65)
+        ax.plot(frame["Time (s)"], frame["Envelope fit"], color="black", linestyle="--", linewidth=1.5)
+        ax.text(
+            0.02,
+            0.90,
+            f"{row['Signal label']}: {row['envelope_fit_percent_change']:.1f}% change, "
+            f"R$^2$={row['envelope_r2']:.2f}",
+            transform=ax.transAxes,
+            va="top",
+            fontsize=13,
+            fontname="Arial",
+        )
+        ax.set_ylabel(row["Y label"], fontsize=15, fontname="Arial")
+        ax.grid(True, linestyle="--", alpha=0.35)
+        ax.tick_params(axis="both", which="major", labelsize=12, direction="in", top=True, right=True)
+        for tick_label in ax.get_xticklabels() + ax.get_yticklabels():
+            tick_label.set_fontname("Arial")
+    axes[-1].set_xlabel("Time, $t$ (s)", fontsize=16, fontname="Arial")
+    fig.suptitle(f"{test_id} MEB Oscillation Envelope Analysis", fontsize=18, fontname="Arial")
+    fig.tight_layout()
+    fig.savefig(plots_dir / "meb_envelope_analysis.png", dpi=180)
+    plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+    for row in metrics_rows:
+        frame = all_envelopes[all_envelopes["Signal key"] == row["Signal key"]]
+        normalized_fit = (
+            frame["Envelope fit"] / row["envelope_normalization"]
+            if row["envelope_normalization"]
+            else np.nan
+        )
+        ax.plot(
+            frame["Time (s)"],
+            frame["Normalized envelope"],
+            color=row["Color"],
+            linewidth=2.1,
+            label=f"{row['Signal label']} ({row['envelope_fit_percent_change']:.0f}%)",
+        )
+        ax.plot(frame["Time (s)"], normalized_fit, color=row["Color"], linestyle="--", linewidth=1.3)
+    ax.set_xlim(window_start_s, window_end_s)
+    ax.set_xlabel("Time, $t$ (s)", fontsize=18, fontname="Arial")
+    ax.set_ylabel("Normalized envelope", fontsize=18, fontname="Arial")
+    ax.grid(True, linestyle="--", alpha=0.35)
+    ax.legend(frameon=False, fontsize=13, loc="upper left")
+    ax.tick_params(axis="both", which="major", labelsize=14, direction="in", top=True, right=True)
+    for tick_label in ax.get_xticklabels() + ax.get_yticklabels():
+        tick_label.set_fontname("Arial")
+    fig.tight_layout()
+    fig.savefig(plots_dir / "meb_normalized_envelope_comparison.png", dpi=180)
+    plt.close(fig)
+
+    return {
+        "meb_envelope_window_start_s": float(window_start_s),
+        "meb_envelope_window_end_s": float(window_end_s),
+        "meb_envelope_signals": ", ".join(row["Signal key"] for row in metrics_rows),
+        **{
+            f"meb_{row['Signal key']}_envelope_percent_change": float(row["envelope_fit_percent_change"])
+            for row in metrics_rows
+        },
+        **{f"meb_{row['Signal key']}_envelope_r2": float(row["envelope_r2"]) for row in metrics_rows},
+    }
+
+
 def save_hydrophone_analysis(
     folder: Path,
     plots_dir: Path,
@@ -1594,20 +1829,39 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     )
 
     if not args.skip_sensors:
-        summary.update(
-            save_hydrophone_analysis(
-                folder,
-                plots_dir,
-                band_min_hz=args.hydrophone_band_min_hz,
-                band_max_hz=args.hydrophone_band_max_hz,
-                oscillation_start_s=args.oscillation_start_s,
-                oscillation_end_s=args.oscillation_end_s,
-                oscillation_max_frequency_hz=args.oscillation_max_frequency_hz,
-                dnb_time_s=dnb_time_s,
-                peak_time_s=peak_time_s,
-                off_time_s=shut_time,
-            )
+        hydrophone_summary = save_hydrophone_analysis(
+            folder,
+            plots_dir,
+            band_min_hz=args.hydrophone_band_min_hz,
+            band_max_hz=args.hydrophone_band_max_hz,
+            oscillation_start_s=args.oscillation_start_s,
+            oscillation_end_s=args.oscillation_end_s,
+            oscillation_max_frequency_hz=args.oscillation_max_frequency_hz,
+            dnb_time_s=dnb_time_s,
+            peak_time_s=peak_time_s,
+            off_time_s=shut_time,
         )
+        summary.update(hydrophone_summary)
+        hydrophone_band_power_path = output_dir / "hydrophone_band_integrated_power.csv"
+        hydrophone_band_power = None
+        if hydrophone_band_power_path.exists():
+            hydrophone_band_power = pd.read_csv(hydrophone_band_power_path)
+        if hydrophone_band_power is not None and "Band-integrated hydrophone power proxy (V^2)" in hydrophone_band_power:
+            summary.update(
+                save_meb_envelope_analysis(
+                    test_id,
+                    output_dir,
+                    plots_dir,
+                    time_s,
+                    surface_temperature,
+                    heat_flux,
+                    hydrophone_band_power["Time (s)"].to_numpy(dtype=float),
+                    hydrophone_band_power["Band-integrated hydrophone power proxy (V^2)"].to_numpy(dtype=float),
+                    window_start_s=args.oscillation_start_s,
+                    window_end_s=args.oscillation_end_s,
+                    off_time_s=shut_time,
+                )
+            )
         summary.update(save_ae_analysis(folder, plots_dir))
         if args.include_wfs:
             summary.update(
