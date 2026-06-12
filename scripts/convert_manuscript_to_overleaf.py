@@ -16,7 +16,6 @@ ROOT = Path(__file__).resolve().parents[1]
 MANUSCRIPT_DIR = ROOT / "manuscripts" / "meb_multimodal_diagnostics"
 SOURCE_MD = MANUSCRIPT_DIR / "manuscript_draft.md"
 OVERLEAF_DIR = MANUSCRIPT_DIR / "overleaf"
-FIGURE_DIR = OVERLEAF_DIR / "figures"
 
 
 FIGURES = {
@@ -442,7 +441,7 @@ def figure_environment(fig_no: str) -> str:
     return (
         "\\begin{figure}[t]\n"
         "  \\centering\n"
-        f"  \\includegraphics[width=\\linewidth]{{figures/{filename}}}\n"
+        f"  \\includegraphics[width=\\linewidth]{{{filename}}}\n"
         f"  \\caption{{{caption}}}\n"
         f"  \\label{{fig:{fig_no}}}\n"
         "\\end{figure}"
@@ -588,17 +587,18 @@ def build_main_tex(md: str) -> str:
     body = convert_body(md)
     data_availability = extract_between(md, "## Data and Code Availability", r"^## Draft Figure Plan")
 
-    return rf"""\documentclass[preprint,12pt]{{elsarticle}}
+    return rf"""\documentclass[review,12pt]{{elsarticle}}
 
 \usepackage{{amsmath,amssymb}}
 \usepackage{{booktabs}}
 \usepackage{{graphicx}}
 \usepackage{{siunitx}}
+\usepackage{{adjustbox}}
 \usepackage{{hyperref}}
 \usepackage{{lineno}}
 
 \journal{{Applied Thermal Engineering}}
-\bibliographystyle{{elsarticle-num-names}}
+\bibliographystyle{{elsarticle-num}}
 
 \begin{{document}}
 
@@ -608,6 +608,8 @@ def build_main_tex(md: str) -> str:
 
 \author[inst1]{{Author list to be finalized}}
 \affiliation[inst1]{{organization={{University of Arkansas}}, city={{Fayetteville}}, state={{AR}}, country={{USA}}}}
+% \cortext[cor1]{{Corresponding author.}}
+% \ead{{corresponding.author@example.edu}}
 
 \begin{{abstract}}
 {convert_inline(abstract)}
@@ -620,6 +622,7 @@ def build_main_tex(md: str) -> str:
 \end{{frontmatter}}
 
 \linenumbers
+\modulolinenumbers[5]
 
 {body}
 
@@ -635,9 +638,28 @@ The authors declare that they have no known competing financial interests or per
 
 Acknowledgements and funding information will be added before submission.
 
+\section*{{CRediT Authorship Contribution Statement}}
+
+Author contributions will be finalized before submission using the CRediT taxonomy.
+
+\section*{{Funding}}
+
+Funding information will be added before submission in the standard Elsevier format.
+
 \bibliography{{references}}
 
 \end{{document}}
+"""
+
+
+def write_highlights() -> str:
+    return r"""\begin{highlights}
+\item Thermal-acoustic diagnostics identify developed microbubble emission boiling.
+\item Hydrophone data separate slow regime modulation from collapse-frequency content.
+\item Acoustic-emission waveforms confirm high-power modulation through a second path.
+\item Envelope fits quantify growth and saturation of thermal oscillations.
+\item Video frames support a vapor/thermal storage-release mechanism.
+\end{highlights}
 """
 
 
@@ -650,12 +672,16 @@ This folder is generated from `../manuscript_draft.md` by running:
 python ../../../scripts/convert_manuscript_to_overleaf.py
 ```
 
-Upload `main.tex`, `references.bib`, and the `figures/` folder to Overleaf. The
-source uses the Elsevier `elsarticle` class for an Applied Thermal Engineering
-preprint-style draft.
+Upload `main.tex`, `references.bib`, `highlights.tex`, and the figure PDFs to
+Overleaf. The source uses the Elsevier `elsarticle` class in review mode for an
+Applied Thermal Engineering submission draft.
 
 Notes:
-- Figure PDFs are copied into `figures/` so the package is self-contained.
+- Figure PDFs are copied to the same folder as `main.tex`. Elsevier's LaTeX
+  submission instructions note that Editorial Manager cannot process figure
+  subfolders reliably.
+- `highlights.tex` is a separate editable file because Applied Thermal
+  Engineering requires Highlights at submission.
 - The author list, funding, acknowledgements, and calibration-specific
   uncertainty language remain placeholders for final submission.
 - Internal workflow sections from the Markdown draft, such as the remaining
@@ -666,15 +692,18 @@ Notes:
 def main() -> None:
     md = SOURCE_MD.read_text(encoding="utf-8")
     OVERLEAF_DIR.mkdir(parents=True, exist_ok=True)
-    FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+    old_figure_dir = OVERLEAF_DIR / "figures"
+    if old_figure_dir.exists():
+        shutil.rmtree(old_figure_dir)
 
     for filename, source in FIGURE_SOURCES.items():
         if not source.exists():
             raise FileNotFoundError(source)
-        shutil.copy2(source, FIGURE_DIR / filename)
+        shutil.copy2(source, OVERLEAF_DIR / filename)
 
     (OVERLEAF_DIR / "main.tex").write_text(build_main_tex(md), encoding="utf-8")
     (OVERLEAF_DIR / "references.bib").write_text(BIBTEX + "\n", encoding="utf-8")
+    (OVERLEAF_DIR / "highlights.tex").write_text(write_highlights(), encoding="utf-8")
     (OVERLEAF_DIR / "README.md").write_text(write_readme(), encoding="utf-8")
 
 

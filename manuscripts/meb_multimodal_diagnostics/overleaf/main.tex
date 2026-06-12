@@ -1,14 +1,15 @@
-\documentclass[preprint,12pt]{elsarticle}
+\documentclass[review,12pt]{elsarticle}
 
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{siunitx}
+\usepackage{adjustbox}
 \usepackage{hyperref}
 \usepackage{lineno}
 
 \journal{Applied Thermal Engineering}
-\bibliographystyle{elsarticle-num-names}
+\bibliographystyle{elsarticle-num}
 
 \begin{document}
 
@@ -18,18 +19,21 @@
 
 \author[inst1]{Author list to be finalized}
 \affiliation[inst1]{organization={University of Arkansas}, city={Fayetteville}, state={AR}, country={USA}}
+% \cortext[cor1]{Corresponding author.}
+% \ead{corresponding.author@example.edu}
 
 \begin{abstract}
-Microbubble emission boiling (MEB) can remove heat fluxes beyond conventional pool-boiling limits, but its onset and development remain difficult to diagnose because wall heat transfer, vapor collapse, liquid replenishment, and acoustic emission evolve together. This study develops a time-resolved thermal-acoustic analysis workflow for subcooled pool boiling on a flat copper surface and applies it to four active-heating tests near 97-98 kPa with electrical power levels from approximately 150 to 250 W. Wall temperature and heat flux are reconstructed from embedded thermocouple data for all four cases, hydrophone signals are analyzed where generated intermediates are available, and acoustic-emission (AE) waveform analysis is performed for the two cases with available waveform files. The maximum reconstructed heat flux increases from 142 to 278 W/cm$^2$ across the power sweep. The two high-power cases exhibit persistent post-transition thermal and acoustic oscillations, whereas the lower-power cases do not show the same developed oscillatory state. Event markers separate the DNB-associated heat-flux drop, the transition wall-temperature peak, the first sustained oscillation peak, and power shutoff. In the high-power cases, hydrophone and AE waveform data show consistent low-frequency envelope modulation near 0.05 and 0.08 Hz. These frequencies are not bubble-collapse carrier frequencies; they quantify slow modulation of the MEB-like state, while literature-reported bubble and sound frequencies typically lie from tens of Hz to several kHz. A Hilbert-envelope analysis with a first-order asymptotic growth model shows that one high-power case reaches thermal-envelope saturation rapidly, with \texttt{tau = 103-106 s} and saturation fraction near 97\%, while the highest-power case develops more slowly, with \texttt{tau = 239-248 s} and saturation fraction of 77-78\% before shutoff. The acoustic power envelopes grow less smoothly than the thermal envelopes, indicating intermittent collapse bursts in addition to slow regime modulation. Together with a first-pass literature compilation of MEB heat-transfer and acoustic signatures, these results show that synchronized thermal-acoustic diagnostics can identify MEB development even when the dataset is too small to establish universal heat-transfer scaling.
+Microbubble emission boiling (MEB) can remove heat fluxes beyond conventional pool-boiling limits, but its onset and development remain difficult to diagnose because wall heat transfer, vapor collapse, liquid replenishment, and acoustic emission evolve together. This study develops a time-resolved thermal-acoustic workflow for subcooled pool boiling on a flat copper surface and applies it to four active-heating tests near 97-98 kPa with electrical power levels from 150 to 250 W. Wall temperature and heat flux are reconstructed from embedded thermocouple data for all four cases. Hydrophone signals are reduced to spectrograms, band-integrated power, and characteristic frequencies, while acoustic-emission waveform analysis is performed for the two cases with available waveform files. The maximum reconstructed heat flux increases from 142 to 278 W/cm$^2$ across the power sweep. The two high-power cases exhibit post-transition thermal and acoustic oscillations, whereas the lower-power cases do not show the same developed state. Event markers separate the DNB-associated heat-flux drop, transition wall-temperature peak, first sustained oscillation peak, and power shutoff. In the developed cases, hydrophone and acoustic-emission data show consistent slow envelope modulation near 0.05 and 0.08 Hz, which describes regime-scale modulation rather than bubble-collapse carrier frequencies. Hilbert-envelope analysis shows rapid thermal-envelope saturation in one developed case and slower growth in the highest-power case. Representative video frames support a storage-release interpretation in which near-wall vapor/thermal energy accumulates before intermittent microbubble release. The results position synchronized thermal-acoustic diagnostics as a route for identifying MEB development and distinguishing slow regime modulation from high-frequency collapse signatures.
 \end{abstract}
 
 \begin{keyword}
-microbubble emission boiling \sep subcooled pool boiling \sep boiling sound \sep hydrophone \sep acoustic emission \sep heat flux \sep oscillation envelope \sep wall temperature
+microbubble emission boiling \sep subcooled pool boiling \sep boiling sound \sep hydrophone \sep acoustic emission \sep heat flux \sep oscillation envelope
 \end{keyword}
 
 \end{frontmatter}
 
 \linenumbers
+\modulolinenumbers[5]
 
 \section{Introduction}
 
@@ -111,7 +115,7 @@ Physically, the progression from Cases A/B to Cases C/D is consistent with incre
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig01_heating_boiling_curves.pdf}
+  \includegraphics[width=\linewidth]{fig01_heating_boiling_curves.pdf}
   \caption{Heating-only boiling curves for the four active-heating cases. Panel (a) shows $q''$ versus $T_w$, and panel (b) shows $q''$ versus wall superheat. Only positive-power heating data are included.}
   \label{fig:1}
 \end{figure}
@@ -128,14 +132,14 @@ The event markers make the analysis auditable. Without them, the envelope window
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig02_case_d_thermal_time_histories.pdf}
+  \includegraphics[width=\linewidth]{fig02_case_d_thermal_time_histories.pdf}
   \caption{Thermal time histories for the highest-power case. Panel (a) shows heat flux and power load versus time. Panel (b) shows embedded thermocouple temperatures and extrapolated wall temperature. Dashed vertical markers identify $t_{\mathrm{DNB}}$, $t_{\mathrm{peak}}$, $t_{\mathrm{osc}}$, and $t_{\mathrm{off}}$.}
   \label{fig:2}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig03_case_c_thermal_time_histories.pdf}
+  \includegraphics[width=\linewidth]{fig03_case_c_thermal_time_histories.pdf}
   \caption{Thermal time histories for the second developed high-power case, plotted with the same definitions and event markers as Fig.~\ref{fig:2}.}
   \label{fig:3}
 \end{figure}
@@ -152,7 +156,7 @@ This distinction provides one of the main contributions of the paper. Acoustic d
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig04_hydrophone_diagnostics.pdf}
+  \includegraphics[width=\linewidth]{fig04_hydrophone_diagnostics.pdf}
   \caption{Hydrophone diagnostics for the active-heating cases. The panels summarize spectrograms, band-integrated PSD power, and characteristic frequencies. The band-integrated power is computed by integrating the linear voltage PSD over frequency before any logarithmic display.}
   \label{fig:4}
 \end{figure}
@@ -167,7 +171,7 @@ The AE and hydrophone results are consistent with prior acoustic boiling studies
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig05_ae_waveform_diagnostics.pdf}
+  \includegraphics[width=\linewidth]{fig05_ae_waveform_diagnostics.pdf}
   \caption{Acoustic-emission waveform diagnostics for the two cases with available waveform files. The panels summarize AE spectrograms, band-integrated PSD power, and characteristic frequencies using the same event-window logic as the hydrophone analysis.}
   \label{fig:5}
 \end{figure}
@@ -205,7 +209,7 @@ Physically, the thermal envelopes likely represent the growth of the regime-scal
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig06_envelope_growth.pdf}
+  \includegraphics[width=\linewidth]{fig06_envelope_growth.pdf}
   \caption{Oscillation-envelope growth and saturation for the developed high-power cases. Smoothed Hilbert envelopes are compared with first-order asymptotic fits, and normalized envelopes show the different thermal and acoustic growth behavior.}
   \label{fig:6}
 \end{figure}
@@ -238,14 +242,14 @@ The model is helpful because it separates three time scales. The kHz-scale acous
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig08_representative_microbubble_frames.pdf}
+  \includegraphics[width=\linewidth]{fig08_representative_microbubble_frames.pdf}
   \caption{Representative high-speed-video frames during developed MEB-like oscillations. Panels compare fewer-bubble and many-bubble states for the developed high-power cases. Frames are visually screened examples and are annotated with the corresponding hydrophone-power percentile.}
   \label{fig:8}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig09_storage_release_model.pdf}
+  \includegraphics[width=\linewidth]{fig09_storage_release_model.pdf}
   \caption{Reduced-order storage-release oscillator for the MEB regime. The model is a conceptual driven, damped, nonlinear oscillator and is used to explain how constant input can produce growing heat-release bursts, acoustic-power modulation, and transient heat flux above the nominal input scale.}
   \label{fig:9}
 \end{figure}
@@ -260,7 +264,7 @@ The literature comparison also identifies what should be extracted next. For hea
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig07_literature_context.pdf}
+  \includegraphics[width=\linewidth]{fig07_literature_context.pdf}
   \caption{First-pass literature context for the present data. The compilation separates heat-transfer quantities from acoustic or oscillatory signature quantities because reported frequencies may describe different physical scales.}
   \label{fig:7}
 \end{figure}
@@ -334,6 +338,14 @@ The authors declare that they have no known competing financial interests or per
 \section*{Acknowledgements}
 
 Acknowledgements and funding information will be added before submission.
+
+\section*{CRediT Authorship Contribution Statement}
+
+Author contributions will be finalized before submission using the CRediT taxonomy.
+
+\section*{Funding}
+
+Funding information will be added before submission in the standard Elsevier format.
 
 \bibliography{references}
 
