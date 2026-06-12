@@ -26,6 +26,9 @@ python scripts\run_manuscript_publication_analysis.py
 - `plots/fig06_envelope_metric_summary.png`
 - `plots/fig07a_literature_boiling_curve_comparison.png`
 - `plots/fig07b_literature_frequency_scale_comparison.png`
+- `final_ate_panels/fig01_ate_case_heat_flux_and_hydrophone_modulation.png`
+- `final_ate_panels/fig02_ate_envelope_metrics.png`
+- `final_ate_panels/fig03_ate_literature_boiling_curve_context.png`
 
 4. Data-coverage checkpoint:
 
@@ -34,7 +37,12 @@ python scripts\run_manuscript_publication_analysis.py
 - AE waveform comparison: Cases C-D only.
 - Literature comparison: first-pass `test2_meb` compilation; still needs final figure/table digitization and source-specific uncertainty notes before submission.
 - A source-by-source digitization queue is saved as `literature_digitization_priority_publication.csv`.
+- Normalized literature boiling points and onset/signature values are saved as `literature_digitized_boiling_points_publication.csv` and `literature_onset_signature_values_publication.csv`; status labels distinguish source-reported values, range endpoints, and any figure-digitized values.
 
 5. Uncertainty checkpoint:
 
-A first-pass data-derived uncertainty/quality diagnostics table was generated as `uncertainty_diagnostics_publication.csv`. It includes pressure stability, thermal linear-fit diagnostics, hydrophone power variability, hydrophone time-bin spacing, and frequency-spread diagnostics. Manufacturer calibration and full uncertainty propagation remain a pre-submission task.
+A pre-submission uncertainty/quality diagnostics table was generated as `uncertainty_diagnostics_publication.csv`. A propagated quantity-level budget is saved as `uncertainty_budget_publication.csv`, including wall temperature, heat flux, event time, hydrophone band power, and characteristic frequency. Manufacturer calibration-certificate values should replace the current source-labeled assumptions before journal submission.
+
+6. Final figure panel checkpoint:
+
+Applied Thermal Engineering style review panels were generated in `final_ate_panels/` with case labels, consistent typography, and provisional uncertainty representation where available. Captions are stored in `final_ate_panels/captions.md`.

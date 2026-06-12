@@ -20,6 +20,23 @@ import numpy as np
 import pandas as pd
 
 
+TC_LOCATION_M = np.array([0, 2.54, 5.08, 7.62]) * 1e-3
+SURFACE_LOCATION_FLAT_CU_M = 13.1826e-3
+CU_THERMAL_CONDUCTIVITY_W_MK = 392.0
+
+# Pre-submission uncertainty assumptions. Replace these with calibration
+# certificate values before final journal submission if available.
+THERMOCOUPLE_STANDARD_UNCERTAINTY_C = 0.50
+TC_POSITION_STANDARD_UNCERTAINTY_M = 0.05e-3
+CU_THERMAL_CONDUCTIVITY_REL_STANDARD_UNCERTAINTY = 0.02
+PRESSURE_TRANSDUCER_FULL_SCALE_KPA = 210.0
+PRESSURE_TRANSDUCER_ACCURACY_FRACTION_FULL_SCALE = 0.0008
+TIME_ALIGNMENT_STANDARD_UNCERTAINTY_S = 0.50
+HYDROPHONE_VOLTAGE_REL_STANDARD_UNCERTAINTY = 0.03
+HYDROPHONE_SENSITIVITY_REL_STANDARD_UNCERTAINTY = 0.10
+PSD_ESTIMATOR_REL_STANDARD_UNCERTAINTY = 0.10
+ENVELOPE_FIT_FLOOR_REL_STANDARD_UNCERTAINTY = 0.10
+
 CASE_MAP = {
     "Boiling-412": {"case": "Case A", "power_W": 150.0},
     "Boiling-413": {"case": "Case B", "power_W": 180.0},
@@ -34,6 +51,47 @@ CASE_COLORS = {
     "Case C": "#C06C84",
     "Case D": "#F67280",
 }
+
+
+def linear_temperature_weights() -> tuple[np.ndarray, np.ndarray]:
+    x = TC_LOCATION_M
+    x_mean = float(np.mean(x))
+    denominator = float(np.sum((x - x_mean) ** 2))
+    slope_weights = (x - x_mean) / denominator
+    intercept_weights = np.full_like(x, 1.0 / len(x)) - x_mean * slope_weights
+    wall_temperature_weights = intercept_weights + SURFACE_LOCATION_FLAT_CU_M * slope_weights
+    heat_flux_weights = -CU_THERMAL_CONDUCTIVITY_W_MK * slope_weights / 1e4
+    return wall_temperature_weights, heat_flux_weights
+
+
+def propagated_thermal_uncertainty(max_heat_flux_w_cm2: float) -> dict[str, float]:
+    wall_weights, heat_flux_weights = linear_temperature_weights()
+    wall_temperature_standard_c = float(
+        np.sqrt(np.sum((wall_weights * THERMOCOUPLE_STANDARD_UNCERTAINTY_C) ** 2))
+    )
+    heat_flux_from_temperature_standard = float(
+        np.sqrt(np.sum((heat_flux_weights * THERMOCOUPLE_STANDARD_UNCERTAINTY_C) ** 2))
+    )
+    heat_flux_from_k_standard = abs(max_heat_flux_w_cm2) * CU_THERMAL_CONDUCTIVITY_REL_STANDARD_UNCERTAINTY
+    heat_flux_combined_standard = float(
+        np.sqrt(heat_flux_from_temperature_standard**2 + heat_flux_from_k_standard**2)
+    )
+    # Position uncertainty is estimated by finite perturbation of the TC pitch.
+    perturbed = TC_LOCATION_M + np.linspace(-1, 1, len(TC_LOCATION_M)) * TC_POSITION_STANDARD_UNCERTAINTY_M
+    x_mean = float(np.mean(perturbed))
+    denominator = float(np.sum((perturbed - x_mean) ** 2))
+    slope_weights_perturbed = (perturbed - x_mean) / denominator
+    heat_flux_weights_perturbed = -CU_THERMAL_CONDUCTIVITY_W_MK * slope_weights_perturbed / 1e4
+    position_sensitivity = float(np.linalg.norm(heat_flux_weights_perturbed - heat_flux_weights))
+    return {
+        "wall_temperature_standard_uncertainty_C": wall_temperature_standard_c,
+        "wall_temperature_expanded_uncertainty_C_k2": 2.0 * wall_temperature_standard_c,
+        "heat_flux_temperature_standard_uncertainty_W_cm2": heat_flux_from_temperature_standard,
+        "heat_flux_k_standard_uncertainty_W_cm2": heat_flux_from_k_standard,
+        "heat_flux_combined_standard_uncertainty_W_cm2": heat_flux_combined_standard,
+        "heat_flux_expanded_uncertainty_W_cm2_k2": 2.0 * heat_flux_combined_standard,
+        "heat_flux_position_sensitivity_W_cm2_per_C": position_sensitivity,
+    }
 
 
 def set_style() -> None:
@@ -236,6 +294,11 @@ def write_uncertainty_diagnostics(
                 "case": case_label(test_id),
                 "nominal_power_W": CASE_MAP[test_id]["power_W"],
                 "pressure_std_kPa": row["pressure_std_kPa"],
+                "pressure_instrument_standard_uncertainty_kPa": (
+                    PRESSURE_TRANSDUCER_FULL_SCALE_KPA
+                    * PRESSURE_TRANSDUCER_ACCURACY_FRACTION_FULL_SCALE
+                    / np.sqrt(3)
+                ),
                 "temperature_heat_flux_fit_mean_R2": summary.get("mean_R2_linear_fit", np.nan),
                 "temperature_heat_flux_fit_min_R2": summary.get("min_R2_linear_fit", np.nan),
                 "hydrophone_band_power_cv": hydro_power_cv,
@@ -243,12 +306,132 @@ def write_uncertainty_diagnostics(
                 "hydrophone_centroid_iqr_Hz": centroid_iqr_hz,
                 "hydrophone_peak_frequency_iqr_Hz": peak_iqr_hz,
                 "ae_waveform_available": bool(summary.get("ae_wfs_available", False)),
-                "note": "Data-derived diagnostic; add manufacturer/calibration uncertainty before submission.",
+                "note": "Data-derived diagnostic with pre-submission instrument assumptions; replace with calibration-certificate values before submission.",
+                **propagated_thermal_uncertainty(row["max_heat_flux_W_cm2"]),
             }
         )
     diagnostics = pd.DataFrame(rows)
     diagnostics.to_csv(output_dir / "uncertainty_diagnostics_publication.csv", index=False)
     return diagnostics
+
+
+def write_uncertainty_budget(
+    output_dir: Path,
+    uncertainty_diagnostics: pd.DataFrame,
+    ae_summary: pd.DataFrame,
+    envelope: pd.DataFrame,
+) -> pd.DataFrame:
+    rows = []
+    for _, row in uncertainty_diagnostics.iterrows():
+        case = row["case"]
+        rows.extend(
+            [
+                {
+                    "case": case,
+                    "quantity": "wall_temperature",
+                    "value": row["wall_temperature_expanded_uncertainty_C_k2"],
+                    "unit": "degC",
+                    "coverage": "expanded k=2",
+                    "basis": "linear extrapolation of four thermocouples; Type-T/DAQ standard uncertainty assumed 0.50 degC",
+                    "source_status": "pre-submission assumption",
+                },
+                {
+                    "case": case,
+                    "quantity": "heat_flux",
+                    "value": row["heat_flux_expanded_uncertainty_W_cm2_k2"],
+                    "unit": "W/cm^2",
+                    "coverage": "expanded k=2",
+                    "basis": "Fourier-law propagation from thermocouple uncertainty plus 2% copper thermal-conductivity standard uncertainty",
+                    "source_status": "pre-submission assumption",
+                },
+                {
+                    "case": case,
+                    "quantity": "event_time",
+                    "value": 2.0 * TIME_ALIGNMENT_STANDARD_UNCERTAINTY_S,
+                    "unit": "s",
+                    "coverage": "expanded k=2",
+                    "basis": "wall-clock synchronization and time-bin/event-picking allowance",
+                    "source_status": "pre-submission assumption",
+                },
+                {
+                    "case": case,
+                    "quantity": "hydrophone_band_power",
+                    "value": 2.0
+                    * np.sqrt(
+                        (2 * HYDROPHONE_VOLTAGE_REL_STANDARD_UNCERTAINTY) ** 2
+                        + (2 * HYDROPHONE_SENSITIVITY_REL_STANDARD_UNCERTAINTY) ** 2
+                        + PSD_ESTIMATOR_REL_STANDARD_UNCERTAINTY**2
+                    ),
+                    "unit": "relative",
+                    "coverage": "expanded k=2",
+                    "basis": "voltage PSD power proxy; combines voltage, sensitivity, and PSD-estimator terms",
+                    "source_status": "pre-submission assumption",
+                },
+                {
+                    "case": case,
+                    "quantity": "hydrophone_characteristic_frequency",
+                    "value": max(row["hydrophone_time_bin_s"] ** -1 if row["hydrophone_time_bin_s"] else 0.0, 3.125),
+                    "unit": "Hz",
+                    "coverage": "resolution-scale",
+                    "basis": "larger of time-window resolution and spectrogram bin-scale floor",
+                    "source_status": "data-derived",
+                },
+            ]
+        )
+    for _, row in ae_summary.iterrows():
+        case = row["case"]
+        rows.extend(
+            [
+                {
+                    "case": case,
+                    "quantity": "ae_band_power",
+                    "value": 2.0
+                    * np.sqrt(
+                        (2 * HYDROPHONE_VOLTAGE_REL_STANDARD_UNCERTAINTY) ** 2
+                        + PSD_ESTIMATOR_REL_STANDARD_UNCERTAINTY**2
+                    ),
+                    "unit": "relative",
+                    "coverage": "expanded k=2",
+                    "basis": "AE waveform voltage PSD proxy; combines voltage-chain and PSD-estimator terms. Waveform files are available only for Cases C-D.",
+                    "source_status": "pre-submission assumption",
+                },
+                {
+                    "case": case,
+                    "quantity": "ae_characteristic_frequency",
+                    "value": 3.125,
+                    "unit": "Hz",
+                    "coverage": "resolution-scale",
+                    "basis": "spectrogram/characteristic-frequency bin-scale floor. Waveform files are available only for Cases C-D.",
+                    "source_status": "data-derived",
+                },
+            ]
+        )
+    if not envelope.empty:
+        for _, row in envelope.iterrows():
+            case = row["case"]
+            signal_key = row["Signal key"]
+            for quantity, unit in [
+                ("envelope_asymptote", row["Y label"]),
+                ("envelope_time_constant_s", "s"),
+                ("envelope_saturation_fraction_at_end", "fraction"),
+            ]:
+                value = pd.to_numeric(row.get(quantity), errors="coerce")
+                if not np.isfinite(value):
+                    continue
+                rows.append(
+                    {
+                        "case": case,
+                        "quantity": f"{signal_key}_{quantity}",
+                        "value": 2.0 * ENVELOPE_FIT_FLOOR_REL_STANDARD_UNCERTAINTY * abs(value),
+                        "unit": unit,
+                        "coverage": "expanded k=2",
+                        "basis": "asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement",
+                        "source_status": "pre-submission assumption",
+                    }
+                )
+    table = pd.DataFrame(rows)
+    table.to_csv(output_dir / "uncertainty_budget_publication.csv", index=False)
+    return table
 
 
 def plot_boiling_curves(repo_root: Path, plots_dir: Path) -> None:
@@ -461,6 +644,186 @@ def plot_literature_comparison(
     plt.close(fig)
 
 
+def plot_final_ate_panels(
+    output_dir: Path,
+    case_summary: pd.DataFrame,
+    hydro_summary: pd.DataFrame,
+    envelope: pd.DataFrame,
+    uncertainty_diagnostics: pd.DataFrame,
+    budget: pd.DataFrame,
+    combined: pd.DataFrame,
+    signatures: pd.DataFrame,
+) -> None:
+    panels_dir = output_dir / "final_ate_panels"
+    panels_dir.mkdir(parents=True, exist_ok=True)
+    u_by_case = uncertainty_diagnostics.set_index("case")
+    colors = [CASE_COLORS[c] for c in case_summary["case"]]
+
+    panel_style = {
+        "font.family": "Arial",
+        "font.size": 8.0,
+        "axes.labelsize": 8.5,
+        "axes.titlesize": 8.5,
+        "xtick.labelsize": 7.5,
+        "ytick.labelsize": 7.5,
+        "legend.fontsize": 7.2,
+        "axes.linewidth": 0.8,
+        "lines.linewidth": 1.25,
+        "savefig.dpi": 600,
+    }
+    with plt.rc_context(panel_style):
+        fig, axes = plt.subplots(1, 2, figsize=(7.25, 3.25), constrained_layout=True)
+        axes[0].text(0.02, 0.98, "(a)", transform=axes[0].transAxes, ha="left", va="top")
+        axes[0].bar(
+            case_summary["case"],
+            case_summary["maximum_heat_flux_W_cm2"],
+            yerr=[
+                u_by_case.loc[c, "heat_flux_expanded_uncertainty_W_cm2_k2"]
+                for c in case_summary["case"]
+            ],
+            capsize=3,
+            color=colors,
+            edgecolor="black",
+            linewidth=0.5,
+        )
+        axes[0].set_ylabel(r"$q^{\prime\prime}_{\max}$ (W cm$^{-2}$)")
+        axes[0].set_xlabel("Case")
+        axes[0].grid(True, axis="y", linestyle=":", alpha=0.45)
+
+        hydro = hydro_summary.copy()
+        hydro["dominant_slow_modulation_Hz"] = pd.to_numeric(
+            hydro["dominant_slow_modulation_Hz"], errors="coerce"
+        )
+        axes[1].text(0.02, 0.98, "(b)", transform=axes[1].transAxes, ha="left", va="top")
+        for _, row in hydro.iterrows():
+            axes[1].scatter(
+                row["nominal_power_W"],
+                row["dominant_slow_modulation_Hz"],
+                s=38,
+                color=CASE_COLORS[row["case"]],
+                edgecolor="black",
+                linewidth=0.4,
+                label=row["case"],
+            )
+        axes[1].set_xlabel(r"$P_{\mathrm{load}}$ (W)")
+        axes[1].set_ylabel("Hydrophone modulation (Hz)")
+        axes[1].grid(True, linestyle=":", alpha=0.45)
+        axes[1].legend(frameon=False, ncol=2, loc="best", handletextpad=0.3)
+        fig.savefig(panels_dir / "fig01_ate_case_heat_flux_and_hydrophone_modulation.png")
+        fig.savefig(panels_dir / "fig01_ate_case_heat_flux_and_hydrophone_modulation.pdf")
+        plt.close(fig)
+
+        if not envelope.empty:
+            keep = envelope[
+                envelope["Signal key"].isin(["wall_temperature", "heat_flux", "hydrophone_power"])
+            ].copy()
+            label_map = {
+                "wall_temperature": r"$T_{\mathrm{w}}$",
+                "heat_flux": r"$q^{\prime\prime}$",
+                "hydrophone_power": "Hydrophone",
+            }
+            keep["plot_label"] = keep["Signal key"].map(label_map)
+            labels = list(dict.fromkeys(keep["plot_label"]))
+            x = np.arange(len(labels))
+            fig, axes = plt.subplots(1, 2, figsize=(7.25, 3.35), constrained_layout=True)
+            width = 0.36
+            for offset, case in [(-width / 2, "Case C"), (width / 2, "Case D")]:
+                data = keep[keep["case"] == case].set_index("plot_label")
+                tau = [data.loc[label, "envelope_time_constant_s"] for label in labels]
+                tau_err = [ENVELOPE_FIT_FLOOR_REL_STANDARD_UNCERTAINTY * value for value in tau]
+                sat = [data.loc[label, "envelope_saturation_fraction_at_end"] for label in labels]
+                axes[0].bar(
+                    x + offset,
+                    tau,
+                    yerr=tau_err,
+                    width=width,
+                    capsize=3,
+                    color=CASE_COLORS[case],
+                    edgecolor="black",
+                    linewidth=0.5,
+                    label=case,
+                )
+                axes[1].bar(
+                    x + offset,
+                    sat,
+                    width=width,
+                    color=CASE_COLORS[case],
+                    edgecolor="black",
+                    linewidth=0.5,
+                    label=case,
+                )
+            for i, ax in enumerate(axes):
+                ax.text(0.02, 0.98, f"({chr(97 + i)})", transform=ax.transAxes, ha="left", va="top")
+                ax.set_xticks(x)
+                ax.set_xticklabels(labels, rotation=12, ha="right")
+                ax.grid(True, axis="y", linestyle=":", alpha=0.45)
+                ax.legend(frameon=False, loc="best", handletextpad=0.3)
+            axes[0].set_ylabel(r"$\tau$ (s)")
+            axes[1].set_ylabel("Saturation fraction")
+            fig.savefig(panels_dir / "fig02_ate_envelope_metrics.png")
+            fig.savefig(panels_dir / "fig02_ate_envelope_metrics.pdf")
+            plt.close(fig)
+
+        points = combined.copy()
+        points["heat_flux_W_cm2"] = np.where(
+            points["y_unit"].str.contains("MW", na=False),
+            points["y_value"] * 100.0,
+            points["y_value"] / 1e4,
+        )
+        points["source_group"] = np.where(
+            points["source_type"] == "user_experiment", "Present work", "Literature"
+        )
+        fig, ax = plt.subplots(figsize=(3.55, 3.25), constrained_layout=True)
+        for group, marker, color in [
+            ("Literature", "o", "#4C78A8"),
+            ("Present work", "s", "#F58518"),
+        ]:
+            data = points[points["source_group"] == group]
+            ax.scatter(
+                data["x_value"],
+                data["heat_flux_W_cm2"],
+                marker=marker,
+                s=18,
+                color=color,
+                edgecolor="none",
+                alpha=0.75,
+                label=group,
+            )
+        ax.set_xlabel(r"$\Delta T_{\mathrm{w}}$ (K)")
+        ax.set_ylabel(r"$q^{\prime\prime}$ (W cm$^{-2}$)")
+        ax.grid(True, linestyle=":", alpha=0.45)
+        ax.legend(frameon=False, loc="best", handletextpad=0.3)
+        fig.savefig(panels_dir / "fig03_ate_literature_boiling_curve_context.png")
+        fig.savefig(panels_dir / "fig03_ate_literature_boiling_curve_context.pdf")
+        plt.close(fig)
+
+    captions = [
+        "# Final Applied Thermal Engineering Figure Panels",
+        "",
+        "These panels are generated by `scripts/run_manuscript_publication_analysis.py` for manuscript review. They use case labels rather than internal test IDs.",
+        "",
+        "## Fig. 1. Case-level thermal and hydrophone response",
+        "",
+        "Panel (a) reports the maximum reconstructed heat flux during active heating. Error bars show the expanded uncertainty (k = 2) from the pre-submission heat-flux uncertainty budget, including thermocouple propagation and a 2% standard uncertainty assigned to copper thermal conductivity. Panel (b) reports the dominant slow modulation frequency extracted from the band-integrated hydrophone power. Hydrophone PSD integration was performed in linear units over the stored hydrophone band before converting any values to dB.",
+        "",
+        "Files: `final_ate_panels/fig01_ate_case_heat_flux_and_hydrophone_modulation.png` and `.pdf`",
+        "",
+        "## Fig. 2. Envelope-fit metrics for developed high-power cases",
+        "",
+        "Panel (a) gives the asymptotic envelope time constant for wall temperature, heat flux, and hydrophone band-integrated power. Error bars show a provisional 10% relative fit-uncertainty floor pending bootstrap or covariance-based refinement. Panel (b) reports the saturation fraction at the end of the active-heating analysis window. AE waveform analysis remains limited to Cases C-D and is used as a separate confirmation of the slow modulation scale.",
+        "",
+        "Files: `final_ate_panels/fig02_ate_envelope_metrics.png` and `.pdf`",
+        "",
+        "## Fig. 3. Literature context for MEB heat-transfer scale",
+        "",
+        "The literature points are first-pass extracted values from `literature-compiler/examples/test2_meb`; values marked as reported text or range endpoints require final figure/table digitization and source-specific uncertainty notes before submission. Present-work points are heating-only BoilingLab values converted to the same wall-superheat and heat-flux units.",
+        "",
+        "Files: `final_ate_panels/fig03_ate_literature_boiling_curve_context.png` and `.pdf`",
+        "",
+    ]
+    (panels_dir / "captions.md").write_text("\n".join(captions), encoding="utf-8")
+
+
 def write_literature_digitization_priority(output_dir: Path) -> pd.DataFrame:
     rows = [
         {
@@ -549,6 +912,78 @@ def write_literature_digitization_priority(output_dir: Path) -> pd.DataFrame:
     return table
 
 
+def write_literature_digitized_tables(
+    output_dir: Path,
+    combined: pd.DataFrame,
+    signatures: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Write normalized literature tables used by final manuscript figures.
+
+    These tables preserve the current extraction method so first-pass text/range
+    values are not confused with completed figure-digitized curves.
+    """
+    lit_points = combined[combined["source_type"] != "user_experiment"].copy()
+    lit_points["wall_superheat_K"] = pd.to_numeric(lit_points["x_value"], errors="coerce")
+    lit_points["heat_flux_W_cm2"] = np.where(
+        lit_points["y_unit"].str.contains("MW", na=False),
+        pd.to_numeric(lit_points["y_value"], errors="coerce") * 100.0,
+        pd.to_numeric(lit_points["y_value"], errors="coerce") / 1e4,
+    )
+    lit_points["digitization_status"] = np.select(
+        [
+            lit_points["extraction_method"].str.contains("digit", case=False, na=False),
+            lit_points["extraction_method"].str.contains("range", case=False, na=False),
+        ],
+        ["figure_digitized_or_curve_point", "reported_range_endpoint"],
+        default="reported_text_or_first_pass_extraction",
+    )
+    lit_points["recommended_use"] = np.where(
+        lit_points["digitization_status"].eq("reported_range_endpoint"),
+        "Use as regime envelope only",
+        "Use as boiling-curve/onset comparison after source verification",
+    )
+    point_cols = [
+        "paper_id",
+        "curve_id",
+        "figure_id",
+        "wall_superheat_K",
+        "heat_flux_W_cm2",
+        "digitization_status",
+        "recommended_use",
+        "notes",
+    ]
+    lit_points = lit_points[point_cols].sort_values(["paper_id", "curve_id"]).reset_index(drop=True)
+    lit_points.to_csv(output_dir / "literature_digitized_boiling_points_publication.csv", index=False)
+
+    onset = signatures.copy()
+    if not onset.empty:
+        onset["frequency_Hz"] = pd.to_numeric(onset.get("frequency_Hz"), errors="coerce")
+        onset["heat_flux_W_cm2"] = pd.to_numeric(onset.get("heat_flux_W_cm2"), errors="coerce")
+        onset["wall_superheat_K"] = pd.to_numeric(onset.get("wall_superheat_K"), errors="coerce")
+        onset["digitization_status"] = np.where(
+            onset["source_type"].eq("user_experiment"),
+            "present_work_reduced_data",
+            "literature_reported_or_first_pass_extraction",
+        )
+        onset_cols = [
+            col
+            for col in [
+                "source_id",
+                "source_type",
+                "signature_type",
+                "wall_superheat_K",
+                "heat_flux_W_cm2",
+                "frequency_Hz",
+                "digitization_status",
+                "notes",
+            ]
+            if col in onset.columns
+        ]
+        onset = onset[onset_cols].reset_index(drop=True)
+    onset.to_csv(output_dir / "literature_onset_signature_values_publication.csv", index=False)
+    return lit_points, onset
+
+
 def write_summary_markdown(
     output_dir: Path,
     availability: pd.DataFrame,
@@ -557,6 +992,9 @@ def write_summary_markdown(
     ae_summary: pd.DataFrame,
     uncertainty_diagnostics: pd.DataFrame,
     digitization_priority: pd.DataFrame,
+    uncertainty_budget: pd.DataFrame,
+    literature_points: pd.DataFrame,
+    literature_onsets: pd.DataFrame,
 ) -> None:
     def markdown_table(frame: pd.DataFrame, float_format: str | None = None) -> str:
         if frame.empty:
@@ -626,9 +1064,34 @@ def write_summary_markdown(
             "",
             markdown_table(uncertainty_diagnostics, ".3g"),
             "",
+            "## Propagated uncertainty budget",
+            "",
+            markdown_table(uncertainty_budget, ".3g"),
+            "",
             "## Literature digitization priority",
             "",
             markdown_table(digitization_priority),
+            "",
+            "## Normalized literature extraction tables",
+            "",
+            "`literature_digitized_boiling_points_publication.csv` contains normalized",
+            "wall-superheat and heat-flux values from the current `test2_meb`",
+            "compilation, with status labels that distinguish source-reported values,",
+            "range endpoints, and any figure-digitized curve points.",
+            "`literature_onset_signature_values_publication.csv` contains onset and",
+            "frequency/signature values used to compare literature MEB behavior with",
+            "the present hydrophone modulation metrics.",
+            "",
+            markdown_table(literature_points.head(12), ".3g"),
+            "",
+            markdown_table(literature_onsets.head(12), ".3g") if not literature_onsets.empty else "",
+            "",
+            "## Final ATE panels",
+            "",
+            "- `final_ate_panels/fig01_ate_case_heat_flux_and_hydrophone_modulation.png`",
+            "- `final_ate_panels/fig02_ate_envelope_metrics.png`",
+            "- `final_ate_panels/fig03_ate_literature_boiling_curve_context.png`",
+            "- `final_ate_panels/captions.md`",
             "",
         ]
     )
@@ -643,6 +1106,9 @@ def write_analysis_history(output_dir: Path) -> None:
         "plots/fig06_envelope_metric_summary.png",
         "plots/fig07a_literature_boiling_curve_comparison.png",
         "plots/fig07b_literature_frequency_scale_comparison.png",
+        "final_ate_panels/fig01_ate_case_heat_flux_and_hydrophone_modulation.png",
+        "final_ate_panels/fig02_ate_envelope_metrics.png",
+        "final_ate_panels/fig03_ate_literature_boiling_curve_context.png",
     ]
     text = [
         "# Analysis History",
@@ -679,10 +1145,15 @@ def write_analysis_history(output_dir: Path) -> None:
             "- AE waveform comparison: Cases C-D only.",
             "- Literature comparison: first-pass `test2_meb` compilation; still needs final figure/table digitization and source-specific uncertainty notes before submission.",
             "- A source-by-source digitization queue is saved as `literature_digitization_priority_publication.csv`.",
+            "- Normalized literature boiling points and onset/signature values are saved as `literature_digitized_boiling_points_publication.csv` and `literature_onset_signature_values_publication.csv`; status labels distinguish source-reported values, range endpoints, and any figure-digitized values.",
             "",
             "5. Uncertainty checkpoint:",
             "",
-            "A first-pass data-derived uncertainty/quality diagnostics table was generated as `uncertainty_diagnostics_publication.csv`. It includes pressure stability, thermal linear-fit diagnostics, hydrophone power variability, hydrophone time-bin spacing, and frequency-spread diagnostics. Manufacturer calibration and full uncertainty propagation remain a pre-submission task.",
+            "A pre-submission uncertainty/quality diagnostics table was generated as `uncertainty_diagnostics_publication.csv`. A propagated quantity-level budget is saved as `uncertainty_budget_publication.csv`, including wall temperature, heat flux, event time, hydrophone band power, and characteristic frequency. Manufacturer calibration-certificate values should replace the current source-labeled assumptions before journal submission.",
+            "",
+            "6. Final figure panel checkpoint:",
+            "",
+            "Applied Thermal Engineering style review panels were generated in `final_ate_panels/` with case labels, consistent typography, and provisional uncertainty representation where available. Captions are stored in `final_ate_panels/captions.md`.",
             "",
         ]
     )
@@ -719,6 +1190,7 @@ def main() -> None:
     hydro_summary, ae_summary = write_acoustic_summary(output_dir, summaries, repo_root)
     envelope = write_envelope_summary(output_dir, repo_root)
     uncertainty_diagnostics = write_uncertainty_diagnostics(output_dir, summaries, repo_root, multi_summary)
+    uncertainty_budget = write_uncertainty_budget(output_dir, uncertainty_diagnostics, ae_summary, envelope)
 
     plot_boiling_curves(repo_root, plots_dir)
     plot_four_case_summary(case_summary, hydro_summary, plots_dir)
@@ -727,6 +1199,21 @@ def main() -> None:
     combined, signatures = load_literature_tables(literature_root)
     plot_literature_comparison(combined, signatures, plots_dir, output_dir)
     digitization_priority = write_literature_digitization_priority(output_dir)
+    literature_points, literature_onsets = write_literature_digitized_tables(
+        output_dir,
+        combined,
+        signatures,
+    )
+    plot_final_ate_panels(
+        output_dir,
+        case_summary,
+        hydro_summary,
+        envelope,
+        uncertainty_diagnostics,
+        uncertainty_budget,
+        combined,
+        signatures,
+    )
 
     write_summary_markdown(
         output_dir,
@@ -736,6 +1223,9 @@ def main() -> None:
         ae_summary,
         uncertainty_diagnostics,
         digitization_priority,
+        uncertainty_budget,
+        literature_points,
+        literature_onsets,
     )
     write_analysis_history(output_dir)
     print(f"Wrote publication analysis to {output_dir}")

@@ -1,0 +1,43 @@
+case,quantity,value,unit,coverage,basis,source_status
+Case A,wall_temperature,1.7243027576385763,degC,expanded k=2,linear extrapolation of four thermocouples; Type-T/DAQ standard uncertainty assumed 0.50 degC,pre-submission assumption
+Case A,heat_flux,8.939142985088912,W/cm^2,expanded k=2,Fourier-law propagation from thermocouple uncertainty plus 2% copper thermal-conductivity standard uncertainty,pre-submission assumption
+Case A,event_time,1.0,s,expanded k=2,wall-clock synchronization and time-bin/event-picking allowance,pre-submission assumption
+Case A,hydrophone_band_power,0.46303347611160905,relative,expanded k=2,"voltage PSD power proxy; combines voltage, sensitivity, and PSD-estimator terms",pre-submission assumption
+Case A,hydrophone_characteristic_frequency,3.125,Hz,resolution-scale,larger of time-window resolution and spectrogram bin-scale floor,data-derived
+Case B,wall_temperature,1.7243027576385763,degC,expanded k=2,linear extrapolation of four thermocouples; Type-T/DAQ standard uncertainty assumed 0.50 degC,pre-submission assumption
+Case B,heat_flux,9.497720711211269,W/cm^2,expanded k=2,Fourier-law propagation from thermocouple uncertainty plus 2% copper thermal-conductivity standard uncertainty,pre-submission assumption
+Case B,event_time,1.0,s,expanded k=2,wall-clock synchronization and time-bin/event-picking allowance,pre-submission assumption
+Case B,hydrophone_band_power,0.46303347611160905,relative,expanded k=2,"voltage PSD power proxy; combines voltage, sensitivity, and PSD-estimator terms",pre-submission assumption
+Case B,hydrophone_characteristic_frequency,3.125,Hz,resolution-scale,larger of time-window resolution and spectrogram bin-scale floor,data-derived
+Case C,wall_temperature,1.7243027576385763,degC,expanded k=2,linear extrapolation of four thermocouples; Type-T/DAQ standard uncertainty assumed 0.50 degC,pre-submission assumption
+Case C,heat_flux,12.723982616501177,W/cm^2,expanded k=2,Fourier-law propagation from thermocouple uncertainty plus 2% copper thermal-conductivity standard uncertainty,pre-submission assumption
+Case C,event_time,1.0,s,expanded k=2,wall-clock synchronization and time-bin/event-picking allowance,pre-submission assumption
+Case C,hydrophone_band_power,0.46303347611160905,relative,expanded k=2,"voltage PSD power proxy; combines voltage, sensitivity, and PSD-estimator terms",pre-submission assumption
+Case C,hydrophone_characteristic_frequency,3.125,Hz,resolution-scale,larger of time-window resolution and spectrogram bin-scale floor,data-derived
+Case D,wall_temperature,1.7243027576385763,degC,expanded k=2,linear extrapolation of four thermocouples; Type-T/DAQ standard uncertainty assumed 0.50 degC,pre-submission assumption
+Case D,heat_flux,13.086273905141303,W/cm^2,expanded k=2,Fourier-law propagation from thermocouple uncertainty plus 2% copper thermal-conductivity standard uncertainty,pre-submission assumption
+Case D,event_time,1.0,s,expanded k=2,wall-clock synchronization and time-bin/event-picking allowance,pre-submission assumption
+Case D,hydrophone_band_power,0.46303347611160905,relative,expanded k=2,"voltage PSD power proxy; combines voltage, sensitivity, and PSD-estimator terms",pre-submission assumption
+Case D,hydrophone_characteristic_frequency,3.125,Hz,resolution-scale,larger of time-window resolution and spectrogram bin-scale floor,data-derived
+Case C,ae_band_power,0.23323807579381203,relative,expanded k=2,AE waveform voltage PSD proxy; combines voltage-chain and PSD-estimator terms. Waveform files are available only for Cases C-D.,pre-submission assumption
+Case C,ae_characteristic_frequency,3.125,Hz,resolution-scale,spectrogram/characteristic-frequency bin-scale floor. Waveform files are available only for Cases C-D.,data-derived
+Case D,ae_band_power,0.23323807579381203,relative,expanded k=2,AE waveform voltage PSD proxy; combines voltage-chain and PSD-estimator terms. Waveform files are available only for Cases C-D.,pre-submission assumption
+Case D,ae_characteristic_frequency,3.125,Hz,resolution-scale,spectrogram/characteristic-frequency bin-scale floor. Waveform files are available only for Cases C-D.,data-derived
+Case C,wall_temperature_envelope_asymptote,3.7658683779991566,Wall temperature (C),expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case C,wall_temperature_envelope_time_constant_s,20.674835397660697,s,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case C,wall_temperature_envelope_saturation_fraction_at_end,0.1948510331067551,fraction,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case C,heat_flux_envelope_asymptote,7.6005759481845345,Heat flux (W/cm$^2$),expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case C,heat_flux_envelope_time_constant_s,21.168257810544276,s,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case C,heat_flux_envelope_saturation_fraction_at_end,0.1943925399705122,fraction,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case C,hydrophone_power_envelope_asymptote,0.007563370693785581,Band-integrated power (V$^2$),expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case C,hydrophone_power_envelope_time_constant_s,153.9745887656152,s,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case C,hydrophone_power_envelope_saturation_fraction_at_end,0.07763412667258007,fraction,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case D,wall_temperature_envelope_asymptote,3.7651663871369636,Wall temperature (C),expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case D,wall_temperature_envelope_time_constant_s,47.81992558389813,s,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case D,wall_temperature_envelope_saturation_fraction_at_end,0.15667068548557317,fraction,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case D,heat_flux_envelope_asymptote,8.30900102315134,Heat flux (W/cm$^2$),expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case D,heat_flux_envelope_time_constant_s,49.55108582030028,s,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case D,heat_flux_envelope_saturation_fraction_at_end,0.15429238339426216,fraction,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case D,hydrophone_power_envelope_asymptote,0.08759443286744795,Band-integrated power (V$^2$),expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case D,hydrophone_power_envelope_time_constant_s,1461.7600001845876,s,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption
+Case D,hydrophone_power_envelope_saturation_fraction_at_end,0.00975411509985718,fraction,expanded k=2,asymptotic envelope-fit parameter; provisional 10% standard fit-uncertainty floor pending bootstrap/covariance refinement,pre-submission assumption

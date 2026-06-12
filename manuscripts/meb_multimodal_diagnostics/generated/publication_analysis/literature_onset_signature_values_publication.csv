@@ -1,0 +1,14 @@
+source_id,source_type,wall_superheat_K,heat_flux_W_cm2,frequency_Hz,digitization_status,notes
+boilinglab_boiling_412,user_experiment,13.9,142.0,,present_work_reduced_data,Lower-power BoilingLab case; no developed MEB envelope analysis yet.
+boilinglab_boiling_413,user_experiment,60.3,163.1,0.005,present_work_reduced_data,Lower-power case with weak/slow hydrophone modulation.
+boilinglab_boiling_416,user_experiment,68.1,267.2,0.05,present_work_reduced_data,Developed thermal-acoustic oscillatory case; AE WFS dominant modulation 0.055 Hz; thermal envelope tau about 103-106 s.
+boilinglab_boiling_417,user_experiment,74.0,278.0,0.08,present_work_reduced_data,Developed thermal-acoustic oscillatory case; AE WFS dominant modulation 0.080 Hz; thermal envelope tau about 239-248 s.
+zeigarnik_2012_microbubble_emission_nature,reported_text,,,,literature_reported_or_first_pass_extraction,Reports microbubble-emission heat-flow ranges up to 0.8-33 MW/m^2 across prior studies; use as historical mechanism context.
+horiuchi_2021_spatiotemporal_meb,reported_text,,,,literature_reported_or_first_pass_extraction,"Reports C-MEB q range 2.2-3.2 MW/m^2, S-MEB heat-flux oscillation amplitude about 1 MW/m^2, and sound-frequency shifts."
+tang_2016_transition_to_meb,reported_text,,,,literature_reported_or_first_pass_extraction,Reports transition from nucleate boiling to MEB and high-frequency repetitive vapor-bubble collapse.
+zhu_2014_visualized_meb,reported_text,,,2700.0,literature_reported_or_first_pass_extraction,Reports visualized MEB at several heat flux/subcooling conditions and a boiling-sound peak near 2700 Hz.
+ono_2023_acoustic_state_detection_meb,reported_text,,,48000.0,literature_reported_or_first_pass_extraction,Uses cepstrum/DNN acoustic state detection; reports max heat flux 6.2 MW/m^2 and hydrophone sampling at 48 kHz.
+kobayashi_2022_homogeneity_boiling_sound_meb,reported_text,,1300.0,,literature_reported_or_first_pass_extraction,Reports boiling sound peak narrowing around 300-500 Hz in developed MEB and bubble passage frequency about 40 Hz.
+zhou_2018_sound_emission_subcooled_pool,reported_text,,,,literature_reported_or_first_pass_extraction,Reports MEB sound peaks around 1 kHz and 10 kHz and high-subcooling components up to/beyond 50 kHz.
+kobayashi_2024_reduced_pressure_confined_meb,reported_text,,311.0,,literature_reported_or_first_pass_extraction,Reports maximum removed heat flux 311 W/cm^2 at reduced pressure with confined vessel; strong comparison target for BoilingLab subatmospheric pressure.
+zhao_2025_open_microchannel_meb,reported_text,,,30.0,literature_reported_or_first_pass_extraction,"Reports MEB initiation at qeff 1436-1834 kW/m^2 and long-duration operation; flow-boiling context, not directly comparable to pool boiling."
