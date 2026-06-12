@@ -1,8 +1,9 @@
 """Build a self-contained Overleaf package for the MEB manuscript.
 
 The manuscript is drafted in Markdown because it is convenient during analysis.
-This script converts the current draft into an Elsevier/Overleaf-friendly LaTeX
-folder with copied figure PDFs and a BibTeX database.
+This script converts the current draft into an Elsevier `elsarticle`
+one-column package following the common `elstest-1p` style, with copied figure
+PDFs, BibTeX styles, class file, highlights, and a BibTeX database.
 """
 
 from __future__ import annotations
@@ -16,6 +17,13 @@ ROOT = Path(__file__).resolve().parents[1]
 MANUSCRIPT_DIR = ROOT / "manuscripts" / "meb_multimodal_diagnostics"
 SOURCE_MD = MANUSCRIPT_DIR / "manuscript_draft.md"
 OVERLEAF_DIR = MANUSCRIPT_DIR / "overleaf"
+ELSARTICLE_TEMPLATE_DIR = ROOT / "vendor" / "elsarticle"
+ELSARTICLE_FILES = [
+    "elsarticle.cls",
+    "elsarticle-num.bst",
+    "elsarticle-num-names.bst",
+    "elsarticle-harv.bst",
+]
 
 
 FIGURES = {
@@ -587,15 +595,13 @@ def build_main_tex(md: str) -> str:
     body = convert_body(md)
     data_availability = extract_between(md, "## Data and Code Availability", r"^## Draft Figure Plan")
 
-    return rf"""\documentclass[review,12pt]{{elsarticle}}
+    return rf"""\documentclass[final,1p,times]{{elsarticle}}
 
 \usepackage{{amsmath,amssymb}}
 \usepackage{{booktabs}}
-\usepackage{{graphicx}}
 \usepackage{{siunitx}}
 \usepackage{{adjustbox}}
 \usepackage{{hyperref}}
-\usepackage{{lineno}}
 
 \journal{{Applied Thermal Engineering}}
 \bibliographystyle{{elsarticle-num}}
@@ -619,10 +625,9 @@ def build_main_tex(md: str) -> str:
 {keyword_tex}
 \end{{keyword}}
 
-\end{{frontmatter}}
+\input{{highlights}}
 
-\linenumbers
-\modulolinenumbers[5]
+\end{{frontmatter}}
 
 {body}
 
@@ -672,16 +677,18 @@ This folder is generated from `../manuscript_draft.md` by running:
 python ../../../scripts/convert_manuscript_to_overleaf.py
 ```
 
-Upload `main.tex`, `references.bib`, `highlights.tex`, and the figure PDFs to
-Overleaf. The source uses the Elsevier `elsarticle` class in review mode for an
-Applied Thermal Engineering submission draft.
+Upload the full contents of this folder to Overleaf. The source uses the
+Elsevier `elsarticle` class in the common `final,1p,times` layout corresponding
+to the `elstest-1p.pdf` example from the Elsevier article template bundle.
 
 Notes:
+- `elsarticle.cls` and the Elsevier `.bst` files are included so the package is
+  self-contained on Overleaf.
 - Figure PDFs are copied to the same folder as `main.tex`. Elsevier's LaTeX
   submission instructions note that Editorial Manager cannot process figure
   subfolders reliably.
-- `highlights.tex` is a separate editable file because Applied Thermal
-  Engineering requires Highlights at submission.
+- `highlights.tex` is input inside the `frontmatter`, matching the Elsevier
+  template convention for Highlights.
 - The author list, funding, acknowledgements, and calibration-specific
   uncertainty language remain placeholders for final submission.
 - Internal workflow sections from the Markdown draft, such as the remaining
@@ -697,6 +704,12 @@ def main() -> None:
         shutil.rmtree(old_figure_dir)
 
     for filename, source in FIGURE_SOURCES.items():
+        if not source.exists():
+            raise FileNotFoundError(source)
+        shutil.copy2(source, OVERLEAF_DIR / filename)
+
+    for filename in ELSARTICLE_FILES:
+        source = ELSARTICLE_TEMPLATE_DIR / filename
         if not source.exists():
             raise FileNotFoundError(source)
         shutil.copy2(source, OVERLEAF_DIR / filename)
