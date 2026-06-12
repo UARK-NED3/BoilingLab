@@ -45,7 +45,7 @@ That physical picture creates an urgent diagnostics problem. If the key process 
 
 Acoustic measurements are a natural candidate for that role because MEB is often loud, intermittent, and collapse-driven. Sound-emission studies in subcooled pool boiling have reported spectral features associated with MEB \citep{tang_2018_sound_emission_subcooled_pool}, and hydrophone-based acoustic state detection has shown that boiling sound can classify MEB states \citep{ono_2023_acoustic_state_detection_meb,ueki_2024_acoustic_state_cucrzr_divertor}. Broader boiling-crisis studies have also used audio-visual-thermal measurements and deep-learning classifiers to identify regime transitions \citep{sinha_2020_audio_visual_thermal_transition,sinha_2021_deep_learning_sound_boiling}, while AE monitoring has demonstrated that boiling-induced elastic waves can carry regime information through a heated structure \citep{baek_2017_ae_water_boiling_cladding}. These results show that acoustic signals contain useful information, but they also expose a trap: a single reported frequency can mean very different things. Bubble-collapse or boiling-sound carrier frequencies may lie from tens of Hz to several kHz \citep{tang_2016_transition_to_meb,zhu_2014_visualized_meb,horiuchi_2021_spatial_temporal_thermal_fluid,kobayashi_2022_on_homogeneity_of_vapor_bubble}, whereas band-integrated acoustic power can oscillate much more slowly as the boiling state grows, saturates, or intermittently bursts. Without synchronized thermal data, these frequency scales can be confused.
 
-The present study addresses that gap by developing a reproducible thermal-acoustic workflow for subcooled pool boiling on a flat copper surface. Four active-heating cases are analyzed in order of increasing imposed electrical power and are referred to as Cases A-D rather than by internal test identifiers. Wall temperature and heat flux are reconstructed from embedded thermocouples for all four cases. Hydrophone signals are reduced to spectrograms, band-integrated power, and characteristic frequencies for all four cases. AE waveform analysis is included only for Cases C and D, because those are the cases with available waveform files. The analysis defines event times for the DNB-associated heat-flux drop, the wall-temperature peak during transition, the first sustained oscillation peak, and power shutoff. It then uses these events to compare heating-only boiling curves, aligned thermal-acoustic time histories, slow acoustic modulation, and asymptotic growth of oscillation envelopes. A first-pass MEB literature compilation is used not as a stand-alone review, but as context for two questions that remain unresolved: how MEB onset and heat-transfer scale should be compared across very different experiments, and how acoustic frequencies should be interpreted when carrier, bubble-cycle, and slow-envelope scales coexist.
+The present study addresses that gap by developing a reproducible thermal-acoustic workflow for subcooled pool boiling on a flat copper surface. Four active-heating cases are analyzed in order of increasing imposed electrical power and are referred to as Cases A-D rather than by internal test identifiers. Wall temperature and heat flux are reconstructed from embedded thermocouples for all four cases. Hydrophone signals are reduced to spectrograms, band-integrated power, and characteristic frequencies for all four cases. AE waveform analysis is included only for Cases C and D, because those are the cases with available waveform files. The analysis defines event times for the DNB-associated heat-flux drop, the wall-temperature peak during transition, the first sustained oscillation peak, and power shutoff. It then uses these events to compare heating-only boiling curves, aligned thermal-acoustic time histories, slow acoustic modulation, and asymptotic growth of oscillation envelopes. The goal is not to establish a universal MEB onset correlation from four tests. Rather, it is to show how synchronized thermal, hydrophone, AE, and video diagnostics can distinguish lower-power reference behavior from a developed oscillatory MEB-like state and can prevent confusion between slow regime modulation and high-frequency collapse signatures. A first-pass MEB literature compilation is used not as a stand-alone review, but as context for two questions that remain unresolved: how MEB onset and heat-transfer scale should be compared across very different experiments, and how acoustic frequencies should be interpreted when carrier, bubble-cycle, and slow-envelope scales coexist.
 
 \section{Experimental Data and Analysis Workflow}
 
@@ -74,11 +74,30 @@ The heated specimen was mounted in a heating-element enclosure inserted through 
 
 The dataset is intentionally interpreted as a pilot study. Cases A and B provide lower-power references. Cases C and D contain the strongest evidence of developed coupled thermal-acoustic oscillations and have the most complete acoustic analysis, including hydrophone and AE waveform processing. Thermal data are available for all four cases; AE waveform files are available only for Cases C and D. The limited number of tests does not support a universal MEB scaling law, but it is sufficient to demonstrate a synchronized analysis method and to identify physically meaningful differences between lower- and higher-power responses.
 
+\begin{table}[t]
+  \centering
+  \caption{Data coverage and interpretation scope for each case.}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{lcccccc}
+    \toprule
+    Case & Nominal power (W) & Thermal reconstruction & Hydrophone diagnostics & AE waveform diagnostics & High-speed video frames & Interpretation scope \\
+    \midrule
+    A & 150 & yes & yes & no waveform file & available & lower-power reference \\
+    B & 180 & yes & yes & no waveform file & available & lower-power reference \\
+    C & 230 & yes & yes & yes & available & developed oscillatory MEB-like case \\
+    D & 250 & yes & yes & yes & available & developed oscillatory MEB-like case \\
+    \bottomrule
+  \end{tabular}
+  }
+\end{table}
+
+The phrase "developed oscillatory MEB-like case" is used in a diagnostic sense. It is assigned only when sustained wall-temperature and heat-flux oscillations after the transition event are accompanied by strong hydrophone band-power modulation and visual evidence of intermittent microbubble release. A low-frequency component extracted from a lower-power hydrophone record is therefore not interpreted as an MEB modulation frequency unless the thermal and visual criteria are also met.
+
 Thermal quantities are reconstructed from the embedded thermocouple array. Temperatures are read from LVM files and used to reconstruct the surface temperature by extrapolating embedded thermocouple measurements through the copper block. Heat flux is calculated from the inferred temperature gradient and the copper thermal conductivity. The approach assumes one-dimensional conduction over the thermocouple line used for extrapolation. The quality of the linear fit through the thermocouple data is stored in the generated summaries and provides a check on the conduction approximation.
 
 The multi-case boiling curves include only heating data. Samples are retained when the aligned DC-power signal is positive. This definition removes the cooling path after power shutoff, which would otherwise mix active boiling behavior with post-heating thermal relaxation. It also makes the comparison more consistent with literature boiling curves that represent increasing or active heat input.
 
-Event times define the analysis windows. Four event times are extracted from each developed case. The DNB-associated time $t_{\mathrm{DNB}}$ is defined as the heat-flux maximum before the sudden heat-flux drop during transition. The wall-temperature peak $t_{\mathrm{peak}}$ identifies the thermal overshoot during that transition. The first sustained oscillation marker $t_{\mathrm{osc}}$ is extracted from the first wall-temperature oscillation peak after the nominal start of the oscillatory window. The shutoff time $t_{\mathrm{off}}$ is defined from the DC-power signal when the power load returns to near zero.
+Event times define the analysis windows. Four event times are extracted from each developed case. The DNB-associated time $t_{\mathrm{DNB}}$ is defined operationally as the heat-flux maximum before the sudden heat-flux drop during transition. The term DNB-associated is used because the signal resembles a departure-from-nucleate-boiling or vapor-coverage transition, but the present measurements do not by themselves prove a classical DNB mechanism. The wall-temperature peak $t_{\mathrm{peak}}$ identifies the thermal overshoot during that transition. The first sustained oscillation marker $t_{\mathrm{osc}}$ is extracted from the first wall-temperature oscillation peak after the nominal start of the oscillatory window. It is not treated as a universal MEB onset time; it defines the start of the envelope-analysis interval for the developed oscillatory state. The shutoff time $t_{\mathrm{off}}$ is defined from the DC-power signal when the power load returns to near zero.
 
 These definitions intentionally separate transition and sustained oscillation. The heat-flux drop and wall-temperature peak occur early in the record and describe the departure from the preceding boiling path. The later $t_{\mathrm{osc}}$ marker defines the start of the envelope-analysis interval for the sustained MEB-like oscillatory state.
 
@@ -122,13 +141,13 @@ Physically, the progression from Cases A/B to Cases C/D is consistent with incre
 
 \subsection{Event markers distinguish transition from sustained oscillatory MEB-like behavior}
 
-Figure 2 shows the high-power Case D time histories with event markers. The heat flux initially increases, reaches a local maximum before a sudden drop, and then recovers into a sustained oscillatory regime. The DNB-associated marker occurs at 124.8 s, and the wall-temperature peak occurs at 132.4 s. The first sustained oscillation peak used for envelope analysis occurs later at 308.0 s, while power is turned off at 673.9 s.
+Figure 2 shows the high-power Case D time histories with event markers. The heat flux initially increases, reaches a local maximum before a sudden drop, and then recovers into a sustained oscillatory regime. The DNB-associated marker occurs at 124.8 s, and the wall-temperature peak occurs at 132.4 s. The first sustained oscillation peak used for envelope analysis occurs later at 308.0 s, while power is turned off at 673.9 s. The separation between these markers is important: the heat-flux maximum is a transition marker, whereas the later $t_{\mathrm{osc}}$ marker is a windowing marker for sustained oscillation.
 
 This sequence indicates that the transition event and the sustained oscillatory state are separated in time. The early heat-flux drop and wall-temperature peak are consistent with a departure from a nucleate-boiling-like path and a transient vapor-coverage or dryout event. The later oscillatory interval is different: wall temperature and heat flux oscillate repeatedly while power remains on. This behavior is closer to the MEB descriptions in which vapor structures repeatedly grow, condense, collapse, and interact with the surrounding liquid.
 
 Figure 3 shows the same analysis for Case C. In this case, the DNB-associated marker occurs at 150.8 s, the wall-temperature peak occurs at 160.8 s, the first sustained oscillation peak occurs at 321.6 s, and power shutoff occurs at 757.8 s. Compared with Case D, Case C begins its sustained oscillatory interval slightly later but has a longer active-heating duration after $t_{\mathrm{osc}}$. This longer window partly explains why its thermal envelope approaches saturation more completely.
 
-The event markers make the analysis auditable. Without them, the envelope window could be chosen subjectively, and transition overshoot could be mixed with sustained oscillation. The markers also create a bridge to the literature. Prior MEB transition studies often focus on the abrupt transition or visual onset \citep{tang_2016_transition_to_meb,tang_2019_transient_nucleate_to_meb}, while acoustic state studies focus on regime classification \citep{ono_2023_acoustic_state_detection_meb}. The present marker set links those perspectives by defining both the transition and the later oscillatory state in one synchronized record.
+The event markers make the analysis auditable. Without them, the envelope window could be chosen subjectively, and transition overshoot could be mixed with sustained oscillation. The markers also create a bridge to the literature. Prior MEB transition studies often focus on the abrupt transition or visual onset \citep{tang_2016_transition_to_meb,tang_2019_transient_nucleate_to_meb}, while acoustic state studies focus on regime classification \citep{ono_2023_acoustic_state_detection_meb}. The present marker set links those perspectives by defining both the transition and the later oscillatory state in one synchronized record. This distinction is also important for practical thermal-system monitoring: a sensor strategy that identifies only the transition event may miss whether the post-transition state stabilizes, strengthens, or remains intermittent under continued heating.
 
 \begin{figure}[t]
   \centering
@@ -148,11 +167,11 @@ The event markers make the analysis auditable. Without them, the envelope window
 
 Figure 4 shows the hydrophone diagnostics. The spectrogram identifies the frequency content of the acoustic signal, while the band-integrated power converts the PSD into a scalar power proxy over time. The characteristic-frequency plot shows how peak frequency and spectral centroid evolve during the same interval. Hydrophone metrics are now available for all four cases. Cases A and B provide lower-power acoustic references, while Cases C and D show stronger band-integrated hydrophone power and clearer sustained oscillatory behavior during the developed MEB-like regime.
 
-The lower-power cases do not show sustained MEB-like oscillations, so their mechanically extracted low-frequency components are not interpreted as MEB modulation frequencies. The developed high-power cases do show a repeatable slow envelope frequency: approximately 0.05 Hz for Case C and 0.08 Hz for Case D. AE waveform analysis gives nearly the same modulation values for the two developed high-power cases, approximately 0.055 Hz and 0.080 Hz. The agreement between hydrophone and AE modulation is important because the two sensors have different coupling paths. The hydrophone senses pressure waves in the liquid, whereas AE senses elastic/acoustic activity transmitted through the solid structure. Agreement between them suggests that the slow modulation in Cases C and D is a real boiling-state feature rather than a single-sensor artifact.
+The lower-power cases do not show sustained MEB-like oscillations, so their mechanically extracted low-frequency components are not interpreted as MEB modulation frequencies. The developed high-power cases do show a repeatable slow modulation frequency of band-integrated acoustic power: approximately 0.05 Hz for Case C and 0.08 Hz for Case D. AE waveform analysis gives nearly the same modulation values for the two developed high-power cases, approximately 0.055 Hz and 0.080 Hz. The agreement between hydrophone and AE modulation is important because the two sensors have different coupling paths. The hydrophone senses pressure waves in the liquid, whereas AE senses elastic/acoustic activity transmitted through the solid structure. Agreement between them suggests that the slow modulation in Cases C and D is a real boiling-state feature rather than a single-sensor artifact.
 
 The frequency interpretation must be handled carefully. Literature-reported MEB sound and bubble frequencies often lie at much higher values. Horiuchi et al. \citep{horiuchi_2021_spatial_temporal_thermal_fluid} and Kobayashi et al. \citep{kobayashi_2022_on_homogeneity_of_vapor_bubble} reported sound or bubble-related frequencies from tens to hundreds of Hz and up to approximately 1000 Hz depending on MEB state. Ando et al. \citep{tang_2016_transition_to_meb} reported repetitive vapor-bubble collapse on the order of 800-2000 Hz, and Zhu et al. \citep{zhu_2014_visualized_meb} reported a boiling-sound peak near 2700 Hz. The present 0.05-0.08 Hz high-power values do not contradict those studies because they describe slow envelope modulation of integrated acoustic power, not the high-frequency carrier generated by individual collapse events.
 
-This distinction provides one of the main contributions of the paper. Acoustic diagnostics should not reduce MEB to one frequency number unless the meaning of that number is specified. A spectrogram may contain high-frequency bubble-collapse or sound content, while the band-integrated power may rise and fall on a much slower regime-development time scale. The slow modulation is useful because it aligns with thermal oscillation amplitude and can be tracked even when high-frequency details depend on sensor bandwidth or coupling.
+This distinction provides one of the main contributions of the paper. Acoustic diagnostics should not reduce MEB to one frequency number unless the meaning of that number is specified. A spectrogram may contain high-frequency bubble-collapse or sound content, while the band-integrated power may rise and fall on a much slower regime-development time scale. The slow modulation is useful because it aligns with thermal oscillation amplitude and can be tracked even when high-frequency details depend on sensor bandwidth or coupling. For applied systems without optical access, this suggests that hydrophone or structure-borne acoustic sensing may provide a nonintrusive indicator of whether a high-heat-flux boiling state is entering a sustained storage-release cycle.
 
 \begin{figure}[t]
   \centering
@@ -178,7 +197,7 @@ The AE and hydrophone results are consistent with prior acoustic boiling studies
 
 \subsection{Asymptotic envelope analysis quantifies how the oscillatory state develops}
 
-Figure 6 shows the oscillation-envelope analysis for Cases C and D. The smoothed thermal envelopes are fitted well by the asymptotic growth model, while the acoustic-power envelopes are more intermittent. The fitted values are summarized in Table 2.
+Figure 6 shows the oscillation-envelope analysis for Cases C and D. The smoothed thermal envelopes are fitted well by the asymptotic growth model, while the acoustic-power envelopes are more intermittent. The fitted values are summarized in Table 3.
 
 \begin{table}[t]
   \centering
@@ -205,7 +224,7 @@ The fitted percent change is large in Case C because the fitted initial envelope
 
 Hydrophone power behaves differently from the thermal envelopes. In Case C, the hydrophone-power envelope grows but has a much longer time constant than the thermal signals. In Case D, the fitted hydrophone time constant is far longer than the experimental window and the $R^2$ is low. This result should not be treated as a failed acoustic measurement. It indicates that the band-integrated acoustic power contains intermittent bursts superimposed on slow modulation. These bursts are expected if individual vapor-collapse events vary in intensity and if the sensor band emphasizes particular collapse or structural-transmission events.
 
-Physically, the thermal envelopes likely represent the growth of the regime-scale oscillation amplitude after transition. The acoustic power envelopes represent both that slow growth and the intermittency of collapse events. This interpretation is consistent with MEB literature that links heat transfer to oscillating vapor structures and liquid motion, while also reporting strong boiling-sound signatures \citep{horiuchi_2021_spatial_temporal_thermal_fluid,kobayashi_2022_on_homogeneity_of_vapor_bubble,tang_2023_bubble_induced_oscillating_flow}.
+Physically, the thermal envelopes likely represent the growth of the regime-scale oscillation amplitude after transition. The acoustic power envelopes represent both that slow growth and the intermittency of collapse events. This interpretation is consistent with MEB literature that links heat transfer to oscillating vapor structures and liquid motion, while also reporting strong boiling-sound signatures \citep{horiuchi_2021_spatial_temporal_thermal_fluid,kobayashi_2022_on_homogeneity_of_vapor_bubble,tang_2023_bubble_induced_oscillating_flow}. The envelope parameters should therefore be interpreted as within-dataset descriptors of how the oscillatory state develops, not as transferable constants for MEB in other geometries or operating conditions.
 
 \begin{figure}[t]
   \centering
@@ -238,7 +257,7 @@ q''_{\mathrm{release}} &= H(\Theta-\Theta_c)\Phi\left(\xi,\frac{\mathrm{d}\xi}{\
 
 where $\Theta$ is a stored thermal/vapor energy state, \texttt{xi} is an effective vapor-film or release coordinate, \texttt{H} is a threshold-like activation, and \texttt{Phi} represents nonlinear release. The plotted implementation is intentionally semi-analytical rather than fitted: it uses an LC-like oscillator with slowly increasing nonlinear feedback to show how a constant input can produce growing heat-release and acoustic-power bursts before the oscillation reaches a finite amplitude. The model should be read as a mechanism sketch and a guide for future fitting, not as a validated predictive correlation.
 
-The model is helpful because it separates three time scales. The kHz-scale acoustic content comes from local collapse and sound generation. The 0.05-0.08 Hz envelope comes from repeated storage and release of the MEB state. The envelope-growth time constant, reported in Table 2, describes how the oscillatory state strengthens after the first sustained peak. This hierarchy of time scales is consistent with prior visual and acoustic MEB studies, but the present dataset connects it to synchronized wall-temperature, heat-flux, hydrophone, AE, and high-speed-video observations.
+The model is helpful because it separates three time scales. The kHz-scale acoustic content comes from local collapse and sound generation. The 0.05-0.08 Hz envelope comes from repeated storage and release of the MEB state. The envelope-growth time constant, reported in Table 3, describes how the oscillatory state strengthens after the first sustained peak. This hierarchy of time scales is consistent with prior visual and acoustic MEB studies, but the present dataset connects it to synchronized wall-temperature, heat-flux, hydrophone, AE, and high-speed-video observations.
 
 \begin{figure}[t]
   \centering
@@ -260,7 +279,27 @@ Figure 7 compares the present cases with the first-pass MEB literature compilati
 
 This comparison is useful because it prevents overclaiming. The present dataset does not demonstrate record-setting MEB heat flux. Its contribution is the synchronized time-resolved diagnostic view: wall-temperature extrapolation, reconstructed heat flux, hydrophone power, AE waveform response where available, characteristic frequencies, and envelope saturation are analyzed on consistent event windows. That combination is less common in the literature than boiling curves, visual snapshots, or acoustic classification alone.
 
-The literature comparison also identifies what should be extracted next. For heat-transfer comparison, the key quantities are MEB onset wall superheat, heat flux at onset, heat flux during stable MEB, pressure, subcooling, heater diameter or area, surface material, surface preparation, and confinement. For acoustic comparison, the key quantities are sensor type, sensor placement, bandwidth, sampling rate, frequency-definition type, spectral peak, and whether the frequency describes bubble oscillation, sound pressure, pressure fluctuation, or slow envelope modulation. Without these metadata, acoustic values from different papers can appear contradictory even when they describe different physical scales.
+The literature comparison also identifies what should be extracted next. For heat-transfer comparison, the key quantities are MEB onset wall superheat, heat flux at onset, heat flux during stable MEB, pressure, subcooling, heater diameter or area, surface material, surface preparation, and confinement. For acoustic comparison, the key quantities are sensor type, sensor placement, bandwidth, sampling rate, frequency-definition type, spectral peak, and whether the frequency describes bubble oscillation, sound pressure, pressure fluctuation, or slow envelope modulation. Without these metadata, acoustic values from different papers can appear contradictory even when they describe different physical scales. Table 4 summarizes the literature-compiler fields that are needed before the screening comparison can be converted into a quantitative cross-study dataset.
+
+\begin{table}[t]
+  \centering
+  \caption{Literature quantities needed for a quantitative MEB comparison dataset.}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{lcc}
+    \toprule
+    Category & Quantities to extract & Reason for inclusion \\
+    \midrule
+    Operating condition & pressure, liquid subcooling, working fluid, heating protocol & controls condensation, collapse, and onset path \\
+    Heater and surface & area or diameter, material, finish, coating, confinement & sets heat-spreading and vapor-structure length scales \\
+    Heat-transfer result & MEB onset wall superheat, onset heat flux, stable MEB heat flux, maximum heat flux & enables comparison with present heating-only boiling curves \\
+    Time-resolved behavior & transition time, oscillation period, vapor-film or plume observations & distinguishes onset from developed oscillation \\
+    Acoustic method & sensor type, placement, bandwidth, sampling rate, calibration state & determines whether acoustic magnitudes are comparable \\
+    Frequency definition & carrier peak, bubble oscillation, pressure fluctuation, PSD centroid, slow envelope modulation & prevents mixing physically different frequency scales \\
+    Source status & text-reported, digitized from figure, range endpoint, estimated from image & tracks confidence and reproducibility of extracted values \\
+    \bottomrule
+  \end{tabular}
+  }
+\end{table}
 
 \begin{figure}[t]
   \centering
@@ -273,6 +312,28 @@ The literature comparison also identifies what should be extracted next. For hea
 
 The present manuscript is built on a small number of experiments. Four cases are enough to demonstrate the workflow and to identify differences between lower- and higher-power behavior, but they are not enough to establish a universal onset criterion or heat-transfer correlation. Thermal quantities are compared across all four cases. Hydrophone time histories currently cover all four cases, but MEB power-envelope frequencies are interpreted only for the developed high-power cases. AE waveform analysis is limited to the two high-power cases because those are the only cases with waveform files. Additional repeats and intermediate power levels are needed to determine whether the observed envelope time constants are repeatable and how they scale with heat load, subcooling, pressure, and surface condition.
 
+Table 5 summarizes the current uncertainty treatment and the remaining calibration terms that must be finalized before submission. The present draft uses data-derived diagnostics to identify sensitivity and repeatability limits, while source-specific calibration values are still being assembled from thermocouple, DAQ, hydrophone, and AE documentation. The distinction is important because some uncertainty components are statistical or algorithmic, while others are instrument-specific systematic terms.
+
+\begin{table}[t]
+  \centering
+  \caption{Current uncertainty and quality-diagnostic status.}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{lccc}
+    \toprule
+    Quantity & Current treatment & Main missing terms before final submission & Manuscript interpretation \\
+    \midrule
+    Wall temperature $T_w$ & extrapolated from four embedded thermocouples; fit quality retained & thermocouple calibration, placement tolerance, copper conductivity uncertainty & filtered surface-temperature estimate \\
+    Heat flux $q''$ & computed from one-dimensional conduction gradient & thermocouple spacing tolerance, conductivity uncertainty, heat-loss correction & filtered wall heat-flux estimate \\
+    Event times & extracted from heat-flux, wall-temperature, and power-load records & sampling alignment uncertainty, threshold sensitivity & operational markers, not universal onset times \\
+    Hydrophone band power & integrated voltage PSD in linear units & hydrophone sensitivity, preamplifier gain, frequency response, background noise & relative within-test acoustic-power proxy \\
+    Characteristic frequency & peak, centroid, and bandwidth from spectrogram bins & window-length resolution, band-selection sensitivity, sensor bandwidth & frequency descriptor tied to chosen PSD band \\
+    AE band power and frequency & same PSD logic for available waveform files & coupling, structural path response, AE sensor calibration & structure-path-weighted acoustic proxy \\
+    Envelope-fit parameters & Hilbert envelope plus asymptotic fit; $R^2$ retained & window-selection sensitivity, smoother-window sensitivity, repeatability across tests & descriptive growth metrics for Cases C and D \\
+    \bottomrule
+  \end{tabular}
+  }
+\end{table}
+
 The thermal reconstruction has its own limits. Wall temperature is extrapolated from embedded thermocouples, so high-frequency surface-temperature fluctuations are filtered by conduction through the copper block and by thermocouple response. The reconstructed heat flux should therefore be interpreted as a filtered wall heat-flux estimate rather than an instantaneous local surface heat flux. This limitation is common in conduction-based boiling measurements, but it is especially important when comparing to high-speed visual or acoustic measurements.
 
 The acoustic measurements are reported as voltage-based proxies rather than calibrated pressure or acoustic power. Hydrophone band-integrated power has units of V$^2$ because it is derived from the measured voltage PSD. AE waveform power is similarly sensor-path dependent. Calibration, sensor frequency response, coupling, placement, and background noise must be documented before the acoustic metrics can be compared quantitatively across laboratories. The present results are strongest for within-test synchronization and relative development, not absolute acoustic intensity.
@@ -283,7 +344,7 @@ The storage-release model is intentionally a reduced-order interpretation. It de
 
 \section{Conclusions}
 
-This study develops and applies a synchronized thermal-acoustic workflow for diagnosing MEB-like development in subcooled pool boiling on a flat copper surface. The main conclusions are as follows.
+This study develops and applies a synchronized thermal-acoustic workflow for diagnosing developed MEB-like behavior in subcooled pool boiling on a flat copper surface. The conclusions are intended as diagnostic and mechanistic findings from a four-case dataset, not as a universal MEB onset correlation. The main conclusions are as follows.
 
 \begin{enumerate}
 
@@ -293,13 +354,13 @@ This study develops and applies a synchronized thermal-acoustic workflow for dia
 
 \begin{enumerate}
 
-  \item Event markers identify distinct stages of the process. The DNB-associated heat-flux drop and transition wall-temperature peak occur early, while the first sustained oscillation peak occurs later and defines the start of the MEB-envelope analysis window.
+  \item Event markers identify distinct stages of the process. The DNB-associated heat-flux maximum and transition wall-temperature peak occur early, while the first sustained oscillation peak occurs later and defines the start of the envelope-analysis window for the developed oscillatory state.
 
 \end{enumerate}
 
 \begin{enumerate}
 
-  \item Hydrophone measurements are now available for all four cases. The lower-power cases provide acoustic references but are not interpreted as having resolved MEB modulation. The developed high-power cases show consistent hydrophone and AE slow envelope modulation. The modulation frequencies are approximately 0.05-0.055 Hz in Case C and 0.08 Hz in Case D. These values describe slow regime modulation, not high-frequency bubble-collapse or boiling-sound carrier frequencies.
+  \item Hydrophone measurements are available for all four cases. The lower-power cases provide acoustic references but are not interpreted as having resolved MEB modulation because they do not satisfy the combined thermal, acoustic, and visual criteria for a developed oscillatory state. The developed high-power cases show consistent hydrophone and AE slow envelope modulation. The modulation frequencies are approximately 0.05-0.055 Hz in Case C and 0.08 Hz in Case D. These values describe slow regime modulation, not high-frequency bubble-collapse or boiling-sound carrier frequencies.
 
 \end{enumerate}
 
@@ -317,13 +378,13 @@ This study develops and applies a synchronized thermal-acoustic workflow for dia
 
 \begin{enumerate}
 
-  \item Representative high-speed-video frames show that microbubble release is temporally nonuniform. A storage-release interpretation explains this observation and provides a physical reason that reconstructed heat flux can transiently exceed the nominal input scale during the oscillatory MEB-like regime.
+  \item Representative high-speed-video frames show that microbubble release is temporally nonuniform. A storage-release interpretation explains this observation and provides a physical reason that reconstructed heat flux can transiently exceed the nominal input scale during the oscillatory MEB-like regime. The reduced-order model is a conceptual mechanism sketch rather than a fitted predictive correlation.
 
 \end{enumerate}
 
 \begin{enumerate}
 
-  \item The first-pass literature comparison shows that the present dataset is best positioned as a multimodal diagnostics contribution rather than a record-heat-flux study. Its value is the synchronized connection among wall temperature, heat flux, hydrophone response, AE response, high-speed-video evidence, and envelope growth.
+  \item The first-pass literature comparison shows that the present dataset is best positioned as a multimodal diagnostics contribution rather than a record-heat-flux study. Its applied value is the synchronized connection among wall temperature, heat flux, hydrophone response, AE response, high-speed-video evidence, and envelope growth, which could support future monitoring of high-heat-flux boiling systems where optical access is limited.
 
 \end{enumerate}
 
