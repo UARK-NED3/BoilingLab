@@ -269,12 +269,18 @@ def write_acoustic_summary(
                 "case": case_label(test_id),
                 "nominal_power_W": CASE_MAP[test_id]["power_W"],
                 "hydrophone_available": hydro_available,
+                "developed_meb_modulation": test_id in {"Boiling-416", "Boiling-417"},
                 "band_power_mean_V2": summary.get("hydrophone_band_power_mean_V2", np.nan),
                 "band_power_max_V2": summary.get("hydrophone_band_power_max_V2", np.nan),
                 "median_peak_frequency_Hz": summary.get("hydrophone_median_peak_frequency_Hz", np.nan),
                 "median_centroid_frequency_Hz": summary.get("hydrophone_median_spectral_centroid_Hz", np.nan),
                 "dominant_slow_modulation_Hz": summary.get(
                     "hydrophone_dominant_oscillation_frequency_Hz", np.nan
+                ),
+                "meb_power_envelope_frequency_Hz": (
+                    summary.get("hydrophone_dominant_oscillation_frequency_Hz", np.nan)
+                    if test_id in {"Boiling-416", "Boiling-417"}
+                    else np.nan
                 ),
                 "power_centroid_best_lag_s": summary.get("hydrophone_power_centroid_best_lag_s", np.nan),
                 "power_centroid_best_correlation": summary.get(
@@ -611,16 +617,16 @@ def plot_four_case_summary(case_summary: pd.DataFrame, hydro_summary: pd.DataFra
     axes[0].legend(frameon=False, loc="best")
 
     hydro = hydro_summary.copy()
-    hydro["dominant_slow_modulation_Hz"] = pd.to_numeric(
-        hydro["dominant_slow_modulation_Hz"], errors="coerce"
+    hydro["meb_power_envelope_frequency_Hz"] = pd.to_numeric(
+        hydro["meb_power_envelope_frequency_Hz"], errors="coerce"
     )
     missing_cases = []
     for _, row in hydro.iterrows():
         color = CASE_COLORS[row["case"]]
-        if np.isfinite(row["dominant_slow_modulation_Hz"]):
+        if np.isfinite(row["meb_power_envelope_frequency_Hz"]):
             axes[1].scatter(
                 row["nominal_power_W"],
-                row["dominant_slow_modulation_Hz"],
+                row["meb_power_envelope_frequency_Hz"],
                 s=80,
                 color=color,
                 label=power_label_from_case(row["case"]),
@@ -628,14 +634,14 @@ def plot_four_case_summary(case_summary: pd.DataFrame, hydro_summary: pd.DataFra
         else:
             missing_cases.append(power_label_from_case(row["case"]))
     axes[1].set_xlabel(r"Nominal power, $P_{\mathrm{load}}$ (W)")
-    axes[1].set_ylabel("Dominant hydrophone slow modulation (Hz)")
+    axes[1].set_ylabel("MEB hydrophone power-envelope frequency (Hz)")
     axes[1].grid(True, linestyle="--", alpha=0.3)
     axes[1].legend(frameon=False, loc="best")
     if missing_cases:
         axes[1].text(
             0.04,
             0.05,
-            "Hydrophone pending: " + ", ".join(missing_cases),
+            "MEB not resolved: " + ", ".join(missing_cases),
             transform=axes[1].transAxes,
             fontsize=11,
             ha="left",
@@ -849,13 +855,15 @@ def plot_final_ate_panels(
         axes[0].legend(frameon=False, loc="best", handletextpad=0.3)
 
         hydro = hydro_summary.copy()
-        hydro["dominant_slow_modulation_Hz"] = pd.to_numeric(
-            hydro["dominant_slow_modulation_Hz"], errors="coerce"
+        hydro["meb_power_envelope_frequency_Hz"] = pd.to_numeric(
+            hydro["meb_power_envelope_frequency_Hz"], errors="coerce"
         )
         for _, row in hydro.iterrows():
+            if not np.isfinite(row["meb_power_envelope_frequency_Hz"]):
+                continue
             axes[1].scatter(
                 row["nominal_power_W"],
-                row["dominant_slow_modulation_Hz"],
+                row["meb_power_envelope_frequency_Hz"],
                 s=38,
                 color=CASE_COLORS[row["case"]],
                 edgecolor="black",
@@ -863,7 +871,7 @@ def plot_final_ate_panels(
                 label=power_label_from_case(row["case"]),
             )
         axes[1].set_xlabel(r"$P_{\mathrm{load}}$ (W)")
-        axes[1].set_ylabel("Hydrophone modulation (Hz)")
+        axes[1].set_ylabel("MEB hydrophone power-envelope frequency (Hz)")
         axes[1].grid(True, linestyle=":", alpha=0.45)
         axes[1].legend(frameon=False, ncol=1, loc="best", handletextpad=0.3)
         add_external_panel_labels(fig, axes)
@@ -962,7 +970,7 @@ def plot_final_ate_panels(
         "",
         "## Fig. 1. Case-level thermal and hydrophone response",
         "",
-        "Panel (a) compares the maximum reconstructed heat flux during active heating with the heat flux at the extracted DNB-associated event time. Error bars on `q''_max` show the expanded uncertainty (k = 2) from the pre-submission heat-flux uncertainty budget, including thermocouple propagation and a 2% standard uncertainty assigned to copper thermal conductivity. Unresolved DNB markers are labeled `n.r.` rather than plotted as misleading values. Panel (b) reports the dominant slow modulation frequency extracted from the band-integrated hydrophone power for all four power loads. Hydrophone PSD integration was performed in linear units over the stored hydrophone band before converting any values to dB.",
+        "Panel (a) compares the maximum reconstructed heat flux during active heating with the heat flux at the extracted DNB-associated event time. Error bars on `q''_max` show the expanded uncertainty (k = 2) from the pre-submission heat-flux uncertainty budget, including thermocouple propagation and a 2% standard uncertainty assigned to copper thermal conductivity. Unresolved DNB markers are labeled `n.r.` rather than plotted as misleading values. Panel (b) reports the MEB hydrophone power-envelope frequency only for the developed high-power cases. Lower-power hydrophone records are retained in the time histories but are not interpreted as MEB modulation because they do not show sustained MEB-like oscillations. Hydrophone PSD integration was performed in linear units over the stored hydrophone band before converting any values to dB.",
         "",
         "Files: `final_ate_panels/fig01_ate_case_heat_flux_and_hydrophone_modulation.png` and `.pdf`",
         "",
@@ -1249,6 +1257,8 @@ def write_summary_markdown(
             "- `final_ate_panels/fig01_ate_case_heat_flux_and_hydrophone_modulation.png`",
             "- `final_ate_panels/fig02_ate_envelope_metrics.png`",
             "- `final_ate_panels/fig03_ate_literature_boiling_curve_context.png`",
+            "- `mechanism/fig08_representative_microbubble_frames.png`",
+            "- `mechanism/fig09_storage_release_model.png`",
             "- `final_ate_panels/captions.md`",
             "",
         ]
@@ -1269,6 +1279,8 @@ def write_analysis_history(output_dir: Path) -> None:
         "final_ate_panels/fig01_ate_case_heat_flux_and_hydrophone_modulation.png",
         "final_ate_panels/fig02_ate_envelope_metrics.png",
         "final_ate_panels/fig03_ate_literature_boiling_curve_context.png",
+        "mechanism/fig08_representative_microbubble_frames.png",
+        "mechanism/fig09_storage_release_model.png",
     ]
     text = [
         "# Analysis History",
@@ -1291,27 +1303,34 @@ def write_analysis_history(output_dir: Path) -> None:
         "python scripts\\run_manuscript_publication_analysis.py",
         "```",
         "",
-        "3. Generated/updated these manuscript-facing plots:",
+        "3. Generated the MEB visual-mechanism screening and storage-release model figures.",
+        "",
+        "```powershell",
+        "python scripts\\make_meb_mechanism_figures.py",
+        "```",
+        "",
+        "4. Generated/updated these manuscript-facing plots:",
         "",
     ]
     text.extend(f"- `{plot}`" for plot in plots)
     text.extend(
         [
             "",
-            "4. Data-coverage checkpoint:",
+            "5. Data-coverage checkpoint:",
             "",
             "- Thermal comparison: Cases A-D.",
-            "- Hydrophone comparison: Cases A-D after Case A regeneration.",
+            "- Hydrophone time histories: Cases A-D after Case A regeneration. MEB power-envelope frequency is resolved only for the developed high-power cases.",
             "- AE waveform comparison: Cases C-D only.",
+            "- High-speed-video representative frames: Cases C-D from MP4 files encoded at 30 fps from 150 fps recordings.",
             "- Literature comparison: first-pass `test2_meb` compilation; still needs final figure/table digitization and source-specific uncertainty notes before submission.",
             "- A source-by-source digitization queue is saved as `literature_digitization_priority_publication.csv`.",
             "- Normalized literature boiling points and onset/signature values are saved as `literature_digitized_boiling_points_publication.csv` and `literature_onset_signature_values_publication.csv`; status labels distinguish source-reported values, range endpoints, and any figure-digitized values.",
             "",
-            "5. Uncertainty checkpoint:",
+            "6. Uncertainty checkpoint:",
             "",
             "A pre-submission uncertainty/quality diagnostics table was generated as `uncertainty_diagnostics_publication.csv`. A propagated quantity-level budget is saved as `uncertainty_budget_publication.csv`, including wall temperature, heat flux, event time, hydrophone band power, and characteristic frequency. Manufacturer calibration-certificate values should replace the current source-labeled assumptions before journal submission.",
             "",
-            "6. Final figure panel checkpoint:",
+            "7. Final figure panel checkpoint:",
             "",
             "Applied Thermal Engineering style review panels were generated in `final_ate_panels/` with case labels, consistent typography, and provisional uncertainty representation where available. Captions are stored in `final_ate_panels/captions.md`.",
             "",

@@ -18,7 +18,13 @@ Key result: Case A now has hydrophone spectrogram, band-integrated power, charac
 python scripts\run_manuscript_publication_analysis.py
 ```
 
-3. Generated/updated these manuscript-facing plots:
+3. Generated the MEB visual-mechanism screening and storage-release model figures.
+
+```powershell
+python scripts\make_meb_mechanism_figures.py
+```
+
+4. Generated/updated these manuscript-facing plots:
 
 - `plots/fig01a_heating_boiling_curve_wall_temperature.png`
 - `plots/fig01b_heating_boiling_curve_wall_superheat.png`
@@ -31,20 +37,23 @@ python scripts\run_manuscript_publication_analysis.py
 - `final_ate_panels/fig01_ate_case_heat_flux_and_hydrophone_modulation.png`
 - `final_ate_panels/fig02_ate_envelope_metrics.png`
 - `final_ate_panels/fig03_ate_literature_boiling_curve_context.png`
+- `mechanism/fig08_representative_microbubble_frames.png`
+- `mechanism/fig09_storage_release_model.png`
 
-4. Data-coverage checkpoint:
+5. Data-coverage checkpoint:
 
 - Thermal comparison: Cases A-D.
-- Hydrophone comparison: Cases A-D after Case A regeneration.
+- Hydrophone time histories: Cases A-D after Case A regeneration. MEB power-envelope frequency is resolved only for the developed high-power cases.
 - AE waveform comparison: Cases C-D only.
+- High-speed-video representative frames: Cases C-D from MP4 files encoded at 30 fps from 150 fps recordings.
 - Literature comparison: first-pass `test2_meb` compilation; still needs final figure/table digitization and source-specific uncertainty notes before submission.
 - A source-by-source digitization queue is saved as `literature_digitization_priority_publication.csv`.
 - Normalized literature boiling points and onset/signature values are saved as `literature_digitized_boiling_points_publication.csv` and `literature_onset_signature_values_publication.csv`; status labels distinguish source-reported values, range endpoints, and any figure-digitized values.
 
-5. Uncertainty checkpoint:
+6. Uncertainty checkpoint:
 
 A pre-submission uncertainty/quality diagnostics table was generated as `uncertainty_diagnostics_publication.csv`. A propagated quantity-level budget is saved as `uncertainty_budget_publication.csv`, including wall temperature, heat flux, event time, hydrophone band power, and characteristic frequency. Manufacturer calibration-certificate values should replace the current source-labeled assumptions before journal submission.
 
-6. Final figure panel checkpoint:
+7. Final figure panel checkpoint:
 
 Applied Thermal Engineering style review panels were generated in `final_ate_panels/` with case labels, consistent typography, and provisional uncertainty representation where available. Captions are stored in `final_ate_panels/captions.md`.

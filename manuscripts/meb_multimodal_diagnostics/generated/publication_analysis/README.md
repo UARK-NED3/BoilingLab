@@ -31,12 +31,12 @@ are the only cases with AE waveform files available in the current dataset.
 
 ## Hydrophone summary
 
-| case | nominal_power_W | hydrophone_available | band_power_mean_V2 | band_power_max_V2 | median_peak_frequency_Hz | median_centroid_frequency_Hz | dominant_slow_modulation_Hz | power_centroid_best_lag_s | power_centroid_best_correlation |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Case A | 150 | True | 0.000648 | 0.00321 | 975 | 1.4e+03 | 0.0247 | 0 | -0.85 |
-| Case B | 180 | True | 0.00409 | 0.0232 | 980 | 1.1e+03 | 0.005 | 0 | -0.803 |
-| Case C | 230 | True | 0.0081 | 0.0595 | 919 | 1.06e+03 | 0.05 | 0.64 | 0.824 |
-| Case D | 250 | True | 0.0157 | 0.344 | 917 | 1.06e+03 | 0.08 | -0.64 | 0.637 |
+| case | nominal_power_W | hydrophone_available | developed_meb_modulation | band_power_mean_V2 | band_power_max_V2 | median_peak_frequency_Hz | median_centroid_frequency_Hz | dominant_slow_modulation_Hz | meb_power_envelope_frequency_Hz | power_centroid_best_lag_s | power_centroid_best_correlation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Case A | 150 | True | False | 0.000648 | 0.00321 | 975 | 1.4e+03 | 0.0247 |  | 0 | -0.85 |
+| Case B | 180 | True | False | 0.00409 | 0.0232 | 980 | 1.1e+03 | 0.005 |  | 0 | -0.803 |
+| Case C | 230 | True | True | 0.0081 | 0.0595 | 919 | 1.06e+03 | 0.05 | 0.05 | 0.64 | 0.824 |
+| Case D | 250 | True | True | 0.0157 | 0.344 | 917 | 1.06e+03 | 0.08 | 0.08 | -0.64 | 0.637 |
 
 ## AE waveform summary
 
@@ -159,4 +159,6 @@ the present hydrophone modulation metrics.
 - `final_ate_panels/fig01_ate_case_heat_flux_and_hydrophone_modulation.png`
 - `final_ate_panels/fig02_ate_envelope_metrics.png`
 - `final_ate_panels/fig03_ate_literature_boiling_curve_context.png`
+- `mechanism/fig08_representative_microbubble_frames.png`
+- `mechanism/fig09_storage_release_model.png`
 - `final_ate_panels/captions.md`
