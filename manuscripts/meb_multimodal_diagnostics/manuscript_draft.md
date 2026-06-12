@@ -1,24 +1,22 @@
 # Time-Resolved Thermal and Acoustic Diagnostics of Microbubble Emission Boiling Under Subcooled Pool Boiling Conditions
 
-**Draft status:** workspace manuscript draft, June 12, 2026  
-**Target article type:** journal article / experimental methods and results  
-**Candidate journals:** International Journal of Heat and Mass Transfer; Experimental Thermal and Fluid Science; International Communications in Heat and Mass Transfer  
-**Corresponding data/code repositories:** `UARK-NED3/BoilingLab` and `hanhuark/literature-compiler`
-
-Unless otherwise noted, BoilingLab figure and data paths are relative to the BoilingLab repository root. Literature-compilation paths refer to the sibling `literature-compiler` repository in the same workspace.
+**Draft status:** journal-facing manuscript draft, June 12, 2026
+**Article type:** experimental heat-transfer and diagnostics paper
+**Candidate journals:** International Journal of Heat and Mass Transfer; Experimental Thermal and Fluid Science; International Communications in Heat and Mass Transfer
+**Data/code repositories:** `UARK-NED3/BoilingLab` and `hanhuark/literature-compiler`
 
 ## Abstract
 
-Microbubble emission boiling (MEB) can sustain heat fluxes beyond conventional boiling limits under highly subcooled conditions, but its onset and development remain difficult to diagnose because heat transfer, vapor-interface motion, and acoustic emission are strongly coupled. This study develops a reproducible thermal-acoustic analysis workflow for subcooled pool boiling experiments and applies it to four flat-copper tests, Boiling-412, Boiling-413, Boiling-416, and Boiling-417, conducted near 97-98 kPa with imposed electrical power levels of approximately 150-250 W. The workflow synchronizes wall-temperature extrapolation, heat-flux reconstruction, power-load timing, hydrophone spectrograms, band-integrated acoustic power, acoustic characteristic frequencies, and acoustic-emission waveform analysis where available. The boiling-curve comparison shows that the maximum reconstructed heat flux increases from 142 W/cm^2 in Boiling-412 to 278 W/cm^2 in Boiling-417, while the high-power cases exhibit persistent thermal and acoustic oscillations during the active-heating period. Event markers identify the DNB-associated heat-flux drop, the wall-temperature peak, the first oscillation peak, and power shutoff. In Boiling-416 and Boiling-417, hydrophone and AE waveform analyses show matching low-frequency envelope modulation, approximately 0.05 Hz and 0.08 Hz, respectively, while literature-reported bubble and sound carrier frequencies typically lie from tens of Hz to several kHz. A Hilbert-envelope analysis fitted with a first-order asymptotic growth model shows that thermal oscillation amplitudes in Boiling-416 approach saturation faster, with time constants of 103-106 s and saturation fractions near 97%, whereas Boiling-417 develops more slowly, with time constants of 239-248 s and saturation fractions of 77-78% before power shutoff. The acoustic power envelopes grow less consistently than the thermal envelopes, indicating that acoustic bursts contain intermittent collapse dynamics in addition to the slowly developing MEB oscillation amplitude. These results position multimodal time-resolved diagnostics as a practical route for identifying MEB development and for connecting laboratory boiling signatures to the broader MEB literature.
+Microbubble emission boiling (MEB) can remove heat fluxes beyond conventional pool-boiling limits, but its onset and development remain difficult to diagnose because wall heat transfer, vapor collapse, liquid replenishment, and acoustic emission evolve together. This study develops a time-resolved thermal-acoustic analysis workflow for subcooled pool boiling on a flat copper surface and applies it to four active-heating tests near 97-98 kPa with electrical power levels from approximately 150 to 250 W. Wall temperature and heat flux are reconstructed from embedded thermocouple data, while hydrophone and acoustic-emission (AE) waveforms are analyzed using spectrograms, band-integrated power, characteristic frequencies, and envelope metrics. The maximum reconstructed heat flux increases from 142 to 278 W/cm^2 across the power sweep. The two high-power cases exhibit persistent post-transition thermal and acoustic oscillations, whereas the lower-power cases do not show the same developed oscillatory state. Event markers separate the DNB-associated heat-flux drop, the transition wall-temperature peak, the first sustained oscillation peak, and power shutoff. In the high-power cases, hydrophone and AE waveform data show consistent low-frequency envelope modulation near 0.05 and 0.08 Hz. These frequencies are not bubble-collapse carrier frequencies; they quantify slow modulation of the MEB-like state, while literature-reported bubble and sound frequencies typically lie from tens of Hz to several kHz. A Hilbert-envelope analysis with a first-order asymptotic growth model shows that one high-power case reaches thermal-envelope saturation rapidly, with `tau = 103-106 s` and saturation fraction near 97%, while the highest-power case develops more slowly, with `tau = 239-248 s` and saturation fraction of 77-78% before shutoff. The acoustic power envelopes grow less smoothly than the thermal envelopes, indicating intermittent collapse bursts in addition to slow regime modulation. Together with a first-pass literature compilation of MEB heat-transfer and acoustic signatures, these results show that synchronized thermal-acoustic diagnostics can identify MEB development even when the dataset is too small to establish universal heat-transfer scaling.
 
-**Keywords:** microbubble emission boiling; subcooled pool boiling; hydrophone; acoustic emission; heat flux; oscillation envelope; boiling sound; wall temperature
+**Keywords:** microbubble emission boiling; subcooled pool boiling; boiling sound; hydrophone; acoustic emission; heat flux; oscillation envelope; wall temperature
 
 ## Nomenclature
 
 | Symbol | Definition | Unit |
 | --- | --- | --- |
 | `A` | oscillation envelope amplitude | signal-dependent |
-| `A_0` | fitted envelope amplitude at `t_osc` | signal-dependent |
+| `A_0` | fitted envelope amplitude at the first sustained oscillation peak | signal-dependent |
 | `A_inf` | fitted asymptotic envelope amplitude | signal-dependent |
 | `f` | frequency | Hz |
 | `P_load` | electrical power load | W |
@@ -27,240 +25,289 @@ Microbubble emission boiling (MEB) can sustain heat fluxes beyond conventional b
 | `T_sat` | saturation temperature | degC |
 | `T_w` | extrapolated wall temperature | degC |
 | `t_DNB` | heat-flux maximum before the DNB-associated drop | s |
-| `t_off` | time when DC power load is turned off | s |
-| `t_osc` | first wall-temperature oscillation peak in the MEB analysis window | s |
+| `t_off` | time when DC power is turned off | s |
+| `t_osc` | first sustained wall-temperature oscillation peak in the analysis window | s |
 | `t_peak` | wall-temperature peak during the transition event | s |
 | `tau` | asymptotic envelope growth time constant | s |
 
 ## 1. Introduction
 
-High-heat-flux cooling increasingly requires boiling regimes that remain effective near or beyond the conventional critical heat-flux limit. Microbubble emission boiling is one such regime. In MEB, vapor structures near the heated surface repeatedly grow, condense, collapse, and emit fine bubbles into subcooled liquid. These dynamics can maintain intense liquid-vapor interaction near the wall and support heat fluxes that exceed conventional nucleate-boiling limits. The same dynamics also make MEB difficult to identify from a single measurement channel. A boiling curve can show enhanced heat transfer or hysteresis, but it does not directly reveal whether the regime is sustained by bubble collapse, liquid replenishment, pressure fluctuations, acoustic emission, or some combination of these processes.
+### 1.1 Background
 
-Prior MEB studies have established several pieces of the physical picture. Zeigarnik et al. [zeigarnik_2012_microbubble_emission_nature] reviewed microbubble emission under highly subcooled boiling and discussed high heat-flow regimes in which fine bubbles are emitted near the surface. Visual studies by Zhu et al. [zhu_2014_visualized_meb] and Tang et al. [tang_2016_transition_to_meb] showed that the transition from nucleate boiling to MEB involves rapid vapor-bubble collapse and microbubble generation. Horiuchi et al. [horiuchi_2021_spatial_temporal_thermal_fluid] connected spatially nonuniform surface temperature, heat-transfer behavior, and boiling sound in distinct MEB states. Tang et al. [tang_2023_bubble_induced_oscillating_flow] further demonstrated that bubble-induced oscillating liquid flow can contribute directly to MEB heat transfer. These studies collectively indicate that MEB is not just a point on a boiling curve; it is a coupled thermal-fluid oscillatory state.
+Boiling heat transfer is used when compact systems must dissipate heat fluxes that are difficult to remove by single-phase convection. The practical limit is often the boiling crisis, where vapor accumulation near the heated surface causes a sharp reduction in liquid contact and a rapid wall-temperature rise. Classical hydrodynamic treatments of critical heat flux (CHF), including the work of Zuber [zuber_1958_stability; zuber_1959_hydrodynamic], established the importance of vapor-liquid interfacial instability, while later texts and reviews organized CHF mechanisms, correlations, and subcooling effects for engineering design [carey_2020_phase_change; liang_2018_chf_review]. These foundations are essential, but they do not fully describe high-subcooling regimes in which strong condensation and vapor collapse can sustain heat transfer after the conventional boiling curve has departed from nucleate boiling.
 
-Acoustic diagnostics provide an additional way to observe this coupled state. Boiling sound and acoustic-emission methods have been used to distinguish boiling regimes, detect transition boiling, and classify MEB-like states. Zhou et al. [zhou_2018_sound_emission_subcooled_pool] reported sound-emission changes in subcooled pool boiling on a small heater, including spectral peaks associated with MEB. Ono et al. [ono_2023_acoustic_state_detection_meb] used hydrophone data and cepstrum-based deep learning to detect MEB acoustic states. Sinha et al. [sinha_2021_deep_learning_sound_boiling] showed that acoustic signatures can predict boiling crisis in water on copper surfaces. These works show that acoustic signals contain regime information, but the relationship between acoustic power, characteristic frequency, wall temperature, and reconstructed heat flux remains underdeveloped for transient MEB development.
+Microbubble emission boiling is one such regime. MEB is generally associated with highly subcooled liquid, high heat flux, rapid collapse of vapor structures, and emission of small bubbles near the heating surface. Early subcooled-boiling observations and photographic studies showed that strong subcooling changes bubble growth and collapse dynamics [gunther_1950_subcooled_bubble_photography; ivey_1966_subcooled_chf]. Inada et al. reported subcooled pool-boiling behavior that later became central to MEB interpretation [inada_1981_subcooled_pool_boiling], while Zeigarnik et al. reviewed microbubble emission under subcooled boiling and discussed mechanisms by which fine bubbles can be emitted from the near-wall region [zeigarnik_2012_microbubble_emission_nature]. The physical picture that emerged is different from ordinary nucleate boiling: rather than relying primarily on detached bubbles leaving the surface, MEB can involve attached or coalesced vapor structures that repeatedly collapse and drive liquid motion near the wall.
 
-The remaining gap is therefore not simply the absence of MEB observations. The gap is the lack of a compact, reproducible framework that synchronizes thermal and acoustic measurements to quantify how an MEB-like oscillatory state develops in time. Most literature values report onset conditions, heat flux, wall superheat, bubble/sound frequency, or visual behavior for selected steady or quasi-steady states. Fewer studies report the time evolution of oscillation amplitude across thermal and acoustic channels during active heating. This is especially important when the number of available tests is limited: a small dataset can still be scientifically useful if it provides synchronized measurements that prior studies did not collect together.
+This distinction matters for high-heat-flux applications because MEB has been reported at heat fluxes that exceed ordinary CHF in subcooled water. Visualized MEB experiments by Zhu et al. [zhu_2014_visualized_meb] and transition studies by Ando et al. [tang_2016_transition_to_meb] showed that MEB development is accompanied by rapid vapor-bubble collapse and microbubble generation. Tang et al. [tang_2019_transient_nucleate_to_meb] and Horiuchi et al. [horiuchi_2021_spatial_temporal_thermal_fluid] examined the transition from nucleate boiling to MEB and showed that spatially nonuniform surface-temperature behavior and boiling sound can distinguish different MEB states. Tang et al. [tang_2023_bubble_induced_oscillating_flow] directly connected bubble-induced oscillating flow to MEB heat transfer using simultaneous bubble and liquid-flow measurements. Li et al. [li_2022_oscillating_vapor_film] further investigated interactions between an oscillating vapor film and the surrounding liquid. These studies indicate that MEB should be treated as a coupled thermal-fluid oscillatory regime rather than only as a high point on a boiling curve.
 
-The present work addresses this gap by developing and applying a multimodal analysis workflow to four subcooled pool-boiling tests on flat copper. The work makes four contributions. First, it defines reproducible event markers from the thermal and power-load data: `t_DNB`, `t_peak`, `t_osc`, and `t_off`. Second, it compares heating-only boiling curves for Boiling-412, Boiling-413, Boiling-416, and Boiling-417. Third, it analyzes hydrophone and AE waveform data for developed cases using spectrograms, band-integrated power, characteristic frequency, and power-frequency alignment. Fourth, it quantifies MEB oscillation-amplitude growth with an asymptotic envelope model and positions the local data against a first-pass MEB literature compilation in `literature-compiler/test2_meb`.
+### 1.2 Motivation
+
+The motivation for the present study is that MEB diagnostics remain fragmented. Many studies report boiling curves, onset conditions, or visualization, but fewer combine wall-temperature reconstruction, heat-flux reconstruction, hydrophone measurements, and AE waveform analysis in the same time base. Without synchronized measurements, it is difficult to determine whether acoustic bursts align with wall-temperature oscillations, whether the heat-flux oscillation amplitude grows or saturates, and whether a detected acoustic frequency describes bubble collapse, sound-carrier frequency, sensor resonance, or slow modulation of the boiling state.
+
+This distinction is important for both mechanism and monitoring. MEB is often described through high-frequency vapor oscillation or boiling sound. For example, Ando et al. [tang_2016_transition_to_meb] reported vapor-bubble collapse frequencies on the order of 800-2000 Hz, Zhu et al. [zhu_2014_visualized_meb] reported boiling-sound peaks near 2700 Hz, and Horiuchi et al. [horiuchi_2021_spatial_temporal_thermal_fluid] reported boiling-sound fundamental frequencies that shift across MEB states. At the same time, practical diagnostics may observe slower amplitude modulation as the regime develops, especially when signals are integrated over frequency bands or filtered by wall conduction, sensor coupling, or data-reduction windows. A diagnostic framework therefore needs to keep carrier frequencies, bubble-cycle frequencies, and slow envelope modulation separate.
+
+Acoustic methods have already shown promise in boiling diagnostics. Tang et al. [tang_2018_sound_emission_subcooled_pool] analyzed sound emission during subcooled pool boiling and reported spectral features associated with MEB. Ono et al. [ono_2023_acoustic_state_detection_meb] used hydrophone data and cepstrum-based machine learning to detect MEB acoustic states. Ueki et al. [ueki_2024_acoustic_state_cucrzr_divertor] extended acoustic state sensing to subcooled boiling on CuCrZr surfaces for divertor-relevant conditions. Broader boiling-crisis studies have also used acoustic and audio-visual-thermal measurements to identify regime transitions and predict critical conditions [sinha_2020_audio_visual_thermal_transition; sinha_2021_deep_learning_sound_boiling]. These studies demonstrate that acoustic signals contain boiling-regime information. They do not, by themselves, provide a compact thermal-acoustic metric for how an MEB-like state grows during active heating.
+
+### 1.3 Literature review and remaining knowledge gaps
+
+The first group of relevant studies focuses on MEB onset and heat-transfer limits. Unno et al. [unno_2022_surface_properties_meb_onset] examined how surface properties affect wall superheat at MEB onset, showing that onset depends on surface condition as well as subcooling and heat flux. Reduced-pressure and confined-vessel work by Unno et al. [unno_2025_reduced_pressure_confined_meb] showed that MEB onset can be achieved in conditions relevant to subatmospheric operation. Inada et al. [inada_2016_cavitation_bubble_blow_pit] showed that cavitation-assisted or droplet-related MEB configurations can reach very high heat fluxes, although those specialized configurations are not directly comparable to flat-surface pool boiling. Open-microchannel MEB work by Zhao et al. [zhao_2025_open_microchannel_meb] demonstrated that MEB concepts can be transferred to flow-boiling heat sinks, where durability and flow instability become additional constraints. These studies establish the breadth of MEB operating spaces, but they also show that heat flux alone is not enough for comparison because geometry, confinement, pressure, subcooling, and surface condition strongly affect the observed regime.
+
+The second group focuses on vapor dynamics and liquid motion. Visual studies by Zhu et al. [zhu_2014_visualized_meb], transition studies by Ando et al. [tang_2016_transition_to_meb], and spatial-temporal studies by Horiuchi et al. [horiuchi_2021_spatial_temporal_thermal_fluid] show that vapor structures can become nonuniform, oscillatory, and acoustically active. Kobayashi et al. [kobayashi_2022_on_homogeneity_of_vapor_bubble] connected homogeneity of vapor-bubble oscillation to heat-transfer characteristics and boiling sound. Recent high-frequency imaging and flow studies [kawakami_2025_high_frequency_meb_flow; tang_2023_bubble_induced_oscillating_flow] further support the idea that bubble oscillation drives liquid motion and contributes to heat transfer. However, these measurements are difficult to reproduce routinely because they require high-speed visualization, optical access, or specialized flow measurement. A lower-cost thermal-acoustic diagnostic would be valuable if it can preserve enough physical information to distinguish MEB development.
+
+The third group uses sound, hydrophone, or AE measurements for boiling-state identification. Sound-emission work in subcooled boiling [tang_2018_sound_emission_subcooled_pool], audio-visual-thermal transition boiling [sinha_2020_audio_visual_thermal_transition], acoustic state detection [ono_2023_acoustic_state_detection_meb], and AE monitoring on heated cladding surfaces [baek_2017_ae_water_boiling_cladding] show that boiling regimes alter acoustic power and spectral content. Diagnostics of boiling onset using thermohydraulic fluctuations [litvintsova_2020_boiling_onset_fluctuations] and reviews of flow-boiling instabilities [mao_2021_flow_boiling_instability_review] provide related signal-analysis context. The limitation is that acoustic metrics are often treated as classification features rather than as coupled variables that can be compared with wall heat flux, wall temperature, and MEB amplitude growth.
+
+The fourth group includes adjacent enhanced-boiling and single-bubble studies that clarify what should and should not be inferred from the present data. Single-bubble boiling on small heaters [elele_2018_single_bubble_boiling], micro/nano structured nucleate boiling [liu_2020_pin_cluster_nucleation], and engineered-surface boiling studies show how surface structure, wettability, and bubble pinning can alter heat transfer. These works are not direct baselines for flat-copper subcooled MEB, but they emphasize that bubble residence, vapor morphology, and liquid replenishment can dominate heat-transfer behavior. They also warn against comparing heat flux values without separating geometry, surface preparation, pressure, subcooling, and regime definition.
+
+From this literature, four knowledge gaps motivate the present study. First, MEB onset and development are usually described by boiling curves, visualization, or acoustic features separately rather than by synchronized thermal-acoustic time histories. Second, slow modulation of oscillation amplitude has not been clearly separated from high-frequency vapor-bubble or sound-carrier frequencies. Third, acoustic power metrics are rarely compared directly with reconstructed wall temperature and heat flux during active MEB development. Fourth, literature comparisons often mix pool boiling, confined boiling, microchannels, engineered surfaces, and specialized droplet/cavitation systems without preserving enough metadata to explain differences.
+
+### 1.4 Present work
+
+The present work develops a reproducible multimodal analysis workflow for subcooled pool boiling on a flat copper surface. Four active-heating cases are analyzed in order of increasing imposed electrical power and are referred to in the manuscript as Cases A-D. Case A is the lowest-power case, Case B is the intermediate-power case, Case C is the high-power case, and Case D is the highest-power case. The raw test identifiers remain in the data repository for traceability, but the manuscript uses case labels because the physical comparison is based on operating condition and response rather than internal lab IDs.
+
+The analysis makes four contributions. First, it defines event times that separate the transition process from the later oscillatory state: `t_DNB`, `t_peak`, `t_osc`, and `t_off`. Second, it compares heating-only boiling curves across the four cases. Third, it analyzes hydrophone and AE waveform data through spectrograms, band-integrated PSD, characteristic frequencies, and power-frequency alignment. Fourth, it introduces an asymptotic envelope model for the growth and saturation of thermal and acoustic oscillation amplitudes. These results are then compared with a first-pass MEB literature compilation that records heat flux, wall superheat, acoustic sensor type, and frequency definitions.
 
 ## 2. Experimental Data and Analysis Workflow
 
-### 2.1 BoilingLab test cases
+### 2.1 Test matrix and case naming
 
-The primary experimental dataset consists of four subcooled pool-boiling cases labeled by test ID: Boiling-412, Boiling-413, Boiling-416, and Boiling-417. The raw data folders are organized by test ID under `Y:\0_Ishraq\New Pool Boiling Video`, and metadata are linked through the Pool Boiling Test Log. The tests were conducted near atmospheric pressure on a flat copper surface with water as the working fluid. The four cases form a first heat-load sweep, with mean DC power during heating increasing from approximately 150 W to 248 W.
+The experimental dataset consists of four subcooled pool-boiling tests on a flat copper surface. The cases were conducted near 97-98 kPa with water as the working fluid. The imposed electrical power was increased across the matrix from approximately 150 W to 250 W. Table 1 summarizes the operating conditions and primary thermal outcomes. The values come from the reproducible BoilingLab multi-case analysis, which retains only the active-heating portion of each test.
 
-Table 1 summarizes the present test conditions and primary thermal outcomes. The multi-case values come from `demos/Boiling-412-413-416-417/generated/summary.csv`.
+**Table 1. Summary of active-heating cases used in this draft.**
 
-**Table 1. Summary of BoilingLab tests used in this draft.**
-
-| Test ID | Applied power (W) | Mean pressure (kPa) | Mean liquid temperature (degC) | `T_sat` (degC) | Maximum `q''` (W/cm^2) | Maximum `T_w` (degC) |
+| Case | Nominal power (W) | Mean pressure (kPa) | Mean liquid temperature (degC) | `T_sat` (degC) | Maximum `q''` (W/cm^2) | Maximum `T_w` (degC) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Boiling-412 | 150 | 97.28 | 58.83 | 98.84 | 142.0 | 112.7 |
-| Boiling-413 | 180 | 97.30 | 52.38 | 98.84 | 163.1 | 159.2 |
-| Boiling-416 | 230 | 97.47 | 57.27 | 98.89 | 267.2 | 167.0 |
-| Boiling-417 | 250 | 97.51 | 57.60 | 98.90 | 278.0 | 172.9 |
+| A | 150 | 97.28 | 58.83 | 98.84 | 142.0 | 112.7 |
+| B | 180 | 97.30 | 52.38 | 98.84 | 163.1 | 159.2 |
+| C | 230 | 97.47 | 57.27 | 98.89 | 267.2 | 167.0 |
+| D | 250 | 97.51 | 57.60 | 98.90 | 278.0 | 172.9 |
 
-The comparison should be interpreted as a pilot dataset rather than a statistically complete parametric study. Boiling-412 and Boiling-413 provide lower-power reference cases. Boiling-416 and Boiling-417 provide the strongest evidence of developed coupled thermal-acoustic oscillations and have the richest acoustic analysis, including hydrophone and AE waveform results.
+The dataset is intentionally interpreted as a pilot study. Cases A and B provide lower-power references. Cases C and D contain the strongest evidence of developed coupled thermal-acoustic oscillations and have the most complete acoustic analysis, including hydrophone and AE waveform processing. The limited number of tests does not support a universal MEB scaling law, but it is sufficient to demonstrate a synchronized analysis method and to identify physically meaningful differences between lower- and higher-power responses.
 
-### 2.2 Thermal data reduction
+### 2.2 Wall temperature and heat flux
 
-The thermal analysis follows the reproducible `BoilingLab` single-case and multi-case scripts. Temperatures are read from the test LVM files, and the surface temperature is extrapolated from embedded thermocouple measurements using a one-dimensional conduction fit through the copper block. Heat flux is reconstructed from the temperature gradient and copper thermal conductivity. The multi-case boiling curves include only the heating portion of each test by retaining samples for which the aligned final column of `DC_power.lvm` is positive. The use of heating-only data is important because the cooling path after power shutoff would otherwise obscure the active-heating boiling curve.
+Temperatures are read from LVM files and used to reconstruct the surface temperature by extrapolating embedded thermocouple measurements through the copper block. Heat flux is calculated from the inferred temperature gradient and the copper thermal conductivity. The approach assumes one-dimensional conduction over the thermocouple line used for extrapolation. The quality of the linear fit through the thermocouple data is stored in the generated summaries and provides a check on the conduction approximation.
 
-For single-case plots, the analysis marks four event times. The DNB marker `t_DNB` is defined as the heat-flux maximum before the sudden heat-flux drop associated with departure from nucleate boiling. The marker `t_peak` is defined as the wall-temperature peak during the transition event. The marker `t_osc` is the first wall-temperature oscillation peak in the oscillatory MEB analysis window, currently searched from 300 s until the smaller of 700 s and `t_off`. Finally, `t_off` is the time at which the DC power load is turned off.
+The multi-case boiling curves include only heating data. Samples are retained when the aligned DC-power signal is positive. This definition removes the cooling path after power shutoff, which would otherwise mix active boiling behavior with post-heating thermal relaxation. It also makes the comparison more consistent with literature boiling curves that represent increasing or active heat input.
 
-### 2.3 Hydrophone and AE signal processing
+### 2.3 Event definitions
 
-Hydrophone data are processed using spectrograms and power spectral density estimates. The band-integrated hydrophone power is computed by integrating the PSD over frequency in linear units, not by averaging dB values. This distinction matters because integration of PSD over a band produces a physically meaningful band-power proxy, whereas direct averaging of dB values does not preserve linear acoustic power. Characteristic acoustic frequencies are extracted from each spectrogram time bin as peak frequency, spectral centroid, and spectral bandwidth.
+Four event times are extracted from each developed case. The DNB-associated time `t_DNB` is defined as the heat-flux maximum before the sudden heat-flux drop during transition. The wall-temperature peak `t_peak` identifies the thermal overshoot during that transition. The first sustained oscillation marker `t_osc` is extracted from the first wall-temperature oscillation peak after the nominal start of the oscillatory window. The shutoff time `t_off` is defined from the DC-power signal when the power load returns to near zero.
 
-For Boiling-416 and Boiling-417, AE waveform files are processed with the same general strategy: a spectrogram is generated from the waveform stream, band-integrated AE power is computed, and characteristic frequencies are extracted. This permits comparison between the hydrophone, which senses pressure/acoustic waves in the liquid, and the AE sensor, which responds to elastic/acoustic activity transmitted through the solid structure and mounting path.
+These definitions intentionally separate transition and sustained oscillation. The heat-flux drop and wall-temperature peak occur early in the record and describe the departure from the preceding boiling path. The later `t_osc` marker defines the start of the envelope-analysis interval for the sustained MEB-like oscillatory state.
 
-### 2.4 Oscillation envelope model
+### 2.4 Acoustic processing
 
-The MEB oscillation-amplitude analysis uses a Hilbert-transform envelope of detrended oscillatory signals. For each signal, the analysis selects the active MEB window, removes a slow baseline using a 75 s Savitzky-Golay smoother, computes the Hilbert envelope of the detrended signal, and smooths the envelope with a 35 s Savitzky-Golay smoother. The primary envelope fit is a first-order asymptotic growth model,
+Hydrophone data are analyzed with spectrograms and PSD-based band integration. The band-integrated hydrophone power is obtained by integrating PSD over frequency in linear units. This produces a voltage-squared band-power proxy. Direct averaging of dB values is avoided because dB is logarithmic and does not preserve linear acoustic power.
+
+Characteristic acoustic frequencies are extracted from each spectrogram time bin. The peak frequency identifies the largest PSD bin in the selected band. The spectral centroid gives the power-weighted frequency, and the bandwidth measures the spread around the centroid. These metrics are plotted over time and compared with the integrated acoustic power to determine whether amplitude bursts align with shifts in spectral content.
+
+AE waveform files are processed with the same overall logic for Cases C and D. The AE sensor responds through a different transmission path than the hydrophone, so agreement between hydrophone and AE modulation is meaningful. It indicates that the slow oscillatory behavior is not an artifact of one sensor alone.
+
+### 2.5 Envelope analysis
+
+The oscillation-amplitude analysis uses a Hilbert-transform envelope. For each signal, the active MEB window is selected, a slow baseline is removed using a 75 s Savitzky-Golay smoother, and the Hilbert envelope of the detrended signal is smoothed with a 35 s Savitzky-Golay window. The smoothed envelope is fitted with a first-order asymptotic growth model:
 
 ```text
 A(t) = A_inf - (A_inf - A_0) exp(-(t - t_osc) / tau)
 ```
 
-where `A_0` is the fitted envelope amplitude at `t_osc`, `A_inf` is the asymptotic envelope amplitude, and `tau` is the growth time constant. The fitted saturation fraction at the end of the window is defined as `(A_end - A_0)/(A_inf - A_0)`. A value near one indicates that the envelope is approaching its fitted asymptote within the observed window. A small value indicates that the model predicts continued growth beyond the observed window or that the signal is poorly represented by a single smooth saturation process.
+Here `A_0` is the fitted envelope amplitude at `t_osc`, `A_inf` is the asymptotic envelope amplitude, and `tau` is the growth time constant. The fitted saturation fraction at the end of the window is `(A_end - A_0)/(A_inf - A_0)`. The model is not intended to prove a universal first-order process. It is used as a compact metric for whether the envelope continues to grow linearly, approaches a finite amplitude, or is poorly described by smooth saturation.
 
-### 2.5 Literature compilation
+### 2.6 Literature compilation
 
-The literature context is organized in `hanhuark/literature-compiler` as `examples/test2_meb`. That case follows the literature-compiler workflow: define a quantitative question, register sources in `references/sources.yaml`, link case-specific source notes in `papers.yaml`, extract first-pass data into CSV files, and generate comparison plots. The current test2 compilation includes 23 MEB-related source records from the local Zotero-derived packet and separates two types of data. The first, `literature-compiler/examples/test2_meb/data/literature_points.csv`, contains first-pass reported-text values where both wall superheat and heat flux are available. The second, `literature-compiler/examples/test2_meb/data/meb_regime_signatures.csv`, records MEB-specific information that does not fit cleanly into a boiling-curve schema, including reported heat-flux ranges, frequency scale, acoustic sensor type, and notes.
+The literature comparison is maintained in the sibling `literature-compiler` repository under `examples/test2_meb`. The case includes 23 MEB-related Zotero sources, screening notes, first-pass heat-flux and wall-superheat values, and a separate table of MEB-specific acoustic and oscillatory signatures. The compilation is used in this manuscript as a structured context rather than as a finalized systematic review. Values marked as reported text or range endpoints should be checked against the original figures and tables before submission.
 
-The literature compilation is explicitly a screening dataset. Values marked as reported text or range endpoints should be checked against original figures and tables before final manuscript submission. Nevertheless, the compilation is useful because it clarifies which quantities should be extracted next: onset wall superheat, heat flux at MEB onset and stable MEB, subcooling, pressure, geometry, bubble/sound frequency, acoustic sensor bandwidth, and whether the reported frequency refers to bubble oscillation, boiling sound, pressure fluctuation, sampling rate, or slow envelope modulation.
+The compilation also records frequency type. This field is essential because the literature contains several different frequency quantities: bubble oscillation frequency, boiling sound peak frequency, pressure fluctuation frequency, hydrophone sampling rate, and slow envelope modulation. The present work reports slow envelope modulation of thermal and acoustic power, so comparisons to high-frequency sound or bubble-collapse values must be made through mechanism rather than by direct numerical equality.
 
 ## 3. Results and Discussion
 
-### 3.1 Heating-only boiling curves show two lower-power reference cases and two high-power oscillatory cases
+### 3.1 Heating-only boiling curves identify the power range where the oscillatory state appears
 
-Figure 1 compares the heating portions of Boiling-412, Boiling-413, Boiling-416, and Boiling-417 as heat flux versus wall temperature and wall superheat. The maximum reconstructed heat flux increases from 142 W/cm^2 in Boiling-412 to 278 W/cm^2 in Boiling-417. The lower-power cases therefore provide a baseline for subcooled boiling without the strongest developed oscillatory behavior, while the higher-power cases enter a regime with large thermal oscillations and synchronized acoustic activity.
+Figure 1 shows the heating-only boiling curves for Cases A-D. The heat flux increases with wall temperature during early heating and then separates by input power. Cases A and B reach maximum reconstructed heat fluxes of 142 and 163 W/cm^2, respectively. Cases C and D reach substantially higher values, 267 and 278 W/cm^2. The higher-power cases also show a different time-domain response, with persistent post-transition oscillations in wall temperature and heat flux.
 
-**Figure 1. Heating-only boiling curves.**  
-Source plots:  
-`demos/Boiling-412-413-416-417/generated/plots/heat_flux_vs_wall_temperature.png`  
-`demos/Boiling-412-413-416-417/generated/plots/heat_flux_vs_wall_superheat.png`
+The figure has two roles in the manuscript. First, it establishes that the four tests are not identical repeats but a power sweep across lower- and higher-intensity boiling responses. Second, it shows why a boiling curve alone is insufficient for this dataset. Cases C and D are close in maximum heat flux, but their time-domain envelope metrics differ strongly. Case C approaches a saturated thermal oscillation amplitude more rapidly, while Case D continues to develop more slowly until power shutoff. That difference is invisible if the data are reduced only to maximum heat flux or a single curve envelope.
 
-The most important trend is not only that the high-power cases reach higher heat flux. Boiling-416 and Boiling-417 also show time-dependent oscillatory signatures after the transition event. This distinguishes them from a simple monotonic boiling-curve comparison. A conventional boiling curve compresses the time history into a trajectory in `q''-T_w` space, but the MEB-like state is better understood as an evolving oscillatory process during active heating.
+Physically, the progression from Cases A/B to Cases C/D is consistent with increasing vapor generation and stronger interaction between near-wall vapor structures and subcooled liquid. The higher-power cases likely provide enough vapor generation to sustain repeated vapor collapse and liquid replenishment, while the lower-power cases remain weaker or less organized. This interpretation agrees with literature that connects MEB to high subcooling, high heat flux, bubble collapse, and oscillating liquid motion [zhu_2014_visualized_meb; tang_2016_transition_to_meb; tang_2023_bubble_induced_oscillating_flow].
 
-### 3.2 Event markers separate DNB, transition temperature peak, oscillation onset, and power shutoff
+**Figure 1. Heating-only boiling curves for the four active-heating cases.** Panel (a) should show `q''` versus `T_w`, and panel (b) should show `q''` versus wall superheat. The plotted data should be labeled as Cases A-D rather than internal test IDs. The caption should state that only positive-power heating data are included.
 
-Figures 2 and 3 show representative thermal time histories for Boiling-416 and Boiling-417 with the event markers `t_DNB`, `t_peak`, `t_osc`, and `t_off`. In Boiling-417, `t_DNB = 124.8 s`, `t_peak = 132.4 s`, `t_osc = 308.0 s`, and `t_off = 673.9 s`. In Boiling-416, `t_DNB = 150.8 s`, `t_peak = 160.8 s`, `t_osc = 321.6 s`, and `t_off = 757.8 s`.
+### 3.2 Event markers distinguish transition from sustained oscillatory MEB-like behavior
 
-**Figure 2. Boiling-417 heat flux and temperature time histories with event markers.**  
-Source plots:  
-`demos/Boiling-417/generated/plots/heat_flux_vs_time.png`  
-`demos/Boiling-417/generated/plots/surface_temperature.png`
+Figure 2 shows the high-power Case D time histories with event markers. The heat flux initially increases, reaches a local maximum before a sudden drop, and then recovers into a sustained oscillatory regime. The DNB-associated marker occurs at 124.8 s, and the wall-temperature peak occurs at 132.4 s. The first sustained oscillation peak used for envelope analysis occurs later at 308.0 s, while power is turned off at 673.9 s.
 
-**Figure 3. Boiling-416 heat flux and temperature time histories with event markers.**  
-Source plots:  
-`demos/Boiling-416/generated/plots/heat_flux_vs_time.png`  
-`demos/Boiling-416/generated/plots/surface_temperature.png`
+This sequence indicates that the transition event and the sustained oscillatory state are separated in time. The early heat-flux drop and wall-temperature peak are consistent with a departure from a nucleate-boiling-like path and a transient vapor-coverage or dryout event. The later oscillatory interval is different: wall temperature and heat flux oscillate repeatedly while power remains on. This behavior is closer to the MEB descriptions in which vapor structures repeatedly grow, condense, collapse, and interact with the surrounding liquid.
 
-The event sequence supports a two-stage interpretation. The early transition event, marked by the heat-flux drop and wall-temperature peak, reflects the departure from the preceding nucleate-boiling-like path. The later `t_osc` marker identifies the first peak of the sustained oscillatory region used for envelope analysis. This separation matters because the thermal peak near DNB and the later MEB oscillation are different diagnostic events. Treating them as one event would mix the transition into the subsequent oscillatory state.
+Figure 3 shows the same analysis for Case C. In this case, the DNB-associated marker occurs at 150.8 s, the wall-temperature peak occurs at 160.8 s, the first sustained oscillation peak occurs at 321.6 s, and power shutoff occurs at 757.8 s. Compared with Case D, Case C begins its sustained oscillatory interval slightly later but has a longer active-heating duration after `t_osc`. This longer window partly explains why its thermal envelope approaches saturation more completely.
 
-### 3.3 Hydrophone and AE measurements identify low-frequency modulation of the developed MEB state
+The event markers make the analysis auditable. Without them, the envelope window could be chosen subjectively, and transition overshoot could be mixed with sustained oscillation. The markers also create a bridge to the literature. Prior MEB transition studies often focus on the abrupt transition or visual onset [tang_2016_transition_to_meb; tang_2019_transient_nucleate_to_meb], while acoustic state studies focus on regime classification [ono_2023_acoustic_state_detection_meb]. The present marker set links those perspectives by defining both the transition and the later oscillatory state in one synchronized record.
 
-Hydrophone spectrograms and band-integrated power traces show strong oscillatory activity during the MEB-like interval. In Boiling-416, the dominant low-frequency hydrophone modulation is approximately 0.05 Hz, corresponding to a period of about 20 s. In Boiling-417, it is approximately 0.08 Hz, corresponding to a period of about 12.5 s. AE waveform analysis gives consistent low-frequency modulation for the same two cases: approximately 0.055 Hz for Boiling-416 and 0.080 Hz for Boiling-417.
+**Figure 2. Case D thermal time histories with event markers.** Panel (a) should show heat flux and power load versus time. Panel (b) should show thermocouple temperatures and extrapolated wall temperature versus time. Labels should mark `t_DNB`, `t_peak`, `t_osc`, and `t_off`.
 
-**Figure 4. Hydrophone spectrograms and integrated power/characteristic-frequency diagnostics.**  
-Representative source plots:  
-`demos/Boiling-417/generated/plots/hydrophone_spectrogram.png`  
-`demos/Boiling-417/generated/plots/hydrophone_band_integrated_power.png`  
-`demos/Boiling-417/generated/plots/hydrophone_characteristic_frequencies.png`  
-`demos/Boiling-416/generated/plots/hydrophone_spectrogram.png`  
-`demos/Boiling-416/generated/plots/hydrophone_band_integrated_power.png`  
-`demos/Boiling-416/generated/plots/hydrophone_characteristic_frequencies.png`
+**Figure 3. Case C thermal time histories with event markers.** The layout should match Figure 2 so the timing and saturation behavior of the two high-power cases can be compared directly.
 
-**Figure 5. AE spectrograms and AE integrated power/characteristic-frequency diagnostics.**  
-Representative source plots:  
-`demos/Boiling-417/generated/plots/ae_wfs_spectrogram.png`  
-`demos/Boiling-417/generated/plots/ae_wfs_band_integrated_power.png`  
-`demos/Boiling-417/generated/plots/ae_wfs_characteristic_frequencies.png`  
-`demos/Boiling-416/generated/plots/ae_wfs_spectrogram.png`  
-`demos/Boiling-416/generated/plots/ae_wfs_band_integrated_power.png`  
-`demos/Boiling-416/generated/plots/ae_wfs_characteristic_frequencies.png`
+### 3.3 Hydrophone spectra and band-integrated power show slow modulation of the developed regime
 
-The low-frequency values reported here should not be interpreted as direct bubble-collapse frequencies. They describe slow modulation of acoustic power and thermal oscillation amplitude over the active MEB interval. In contrast, many MEB studies report bubble oscillation, sound, or pressure spectral features from tens of Hz to several kHz. For example, Tang et al. [tang_2016_transition_to_meb] reported repetitive vapor-bubble collapse on the order of 800-2000 Hz, Zhu et al. [zhu_2014_visualized_meb] reported a boiling-sound peak around 2700 Hz, and Horiuchi et al. [horiuchi_2021_spatial_temporal_thermal_fluid] reported boiling-sound fundamental frequencies that shift across MEB states. The present data therefore add a slower envelope-scale diagnostic rather than contradicting the high-frequency literature.
+Figure 4 shows the hydrophone diagnostics. The spectrogram identifies the frequency content of the acoustic signal, while the band-integrated power converts the PSD into a scalar power proxy over time. The characteristic-frequency plot shows how peak frequency and spectral centroid evolve during the same interval. In the developed high-power cases, the band-integrated hydrophone power oscillates strongly during the sustained MEB-like regime.
 
-### 3.4 Thermal oscillation envelopes grow toward saturation, but acoustic power remains more intermittent
+The dominant low-frequency modulation extracted from hydrophone power is approximately 0.05 Hz for Case C and 0.08 Hz for Case D. These values correspond to periods of approximately 20 s and 12.5 s. AE waveform analysis gives nearly the same modulation values for the same two cases, approximately 0.055 Hz and 0.080 Hz. The agreement between hydrophone and AE modulation is important because the two sensors have different coupling paths. The hydrophone senses pressure waves in the liquid, whereas AE senses elastic/acoustic activity transmitted through the solid structure. Agreement between them suggests that the slow modulation is a real boiling-state feature rather than a single-sensor artifact.
 
-Figure 6 shows the MEB envelope analysis for Boiling-416 and Boiling-417. The thermal envelopes are fitted well by the asymptotic growth model, whereas the hydrophone power envelope is more intermittent and less consistently represented by a single saturation curve.
+The frequency interpretation must be handled carefully. Literature-reported MEB sound and bubble frequencies often lie at much higher values. Horiuchi et al. [horiuchi_2021_spatial_temporal_thermal_fluid] and Kobayashi et al. [kobayashi_2022_on_homogeneity_of_vapor_bubble] reported sound or bubble-related frequencies from tens to hundreds of Hz and up to approximately 1000 Hz depending on MEB state. Ando et al. [tang_2016_transition_to_meb] reported repetitive vapor-bubble collapse on the order of 800-2000 Hz, and Zhu et al. [zhu_2014_visualized_meb] reported a boiling-sound peak near 2700 Hz. The present 0.05-0.08 Hz values do not contradict those studies because they describe slow envelope modulation of integrated acoustic power, not the high-frequency carrier generated by individual collapse events.
 
-**Figure 6. MEB oscillation envelope analysis.**  
-Source plots:  
-`demos/Boiling-416/generated/plots/meb_envelope_analysis.png`  
-`demos/Boiling-417/generated/plots/meb_envelope_analysis.png`  
-`demos/Boiling-416/generated/plots/meb_normalized_envelope_comparison.png`  
-`demos/Boiling-417/generated/plots/meb_normalized_envelope_comparison.png`
+This distinction provides one of the main contributions of the paper. Acoustic diagnostics should not reduce MEB to one frequency number unless the meaning of that number is specified. A spectrogram may contain high-frequency bubble-collapse or sound content, while the band-integrated power may rise and fall on a much slower regime-development time scale. The slow modulation is useful because it aligns with thermal oscillation amplitude and can be tracked even when high-frequency details depend on sensor bandwidth or coupling.
 
-**Table 2. Asymptotic envelope metrics for Boiling-416 and Boiling-417.**
+**Figure 4. Hydrophone diagnostics for the developed high-power cases.** Each case should include a spectrogram, band-integrated power, and characteristic frequencies. The caption should state the band used for PSD integration and should distinguish slow power modulation from high-frequency spectral content.
+
+### 3.4 AE waveform analysis confirms the slow modulation observed by the hydrophone
+
+Figure 5 presents the AE waveform diagnostics. The AE spectrogram shows frequency content transmitted through the structure, while AE band-integrated power and characteristic frequencies provide time-resolved scalar metrics. For Cases C and D, the AE waveform analysis detects the same low-frequency modulation scale as the hydrophone. This agreement increases confidence that the observed modulation is tied to the boiling process.
+
+The AE data also highlight a measurement challenge. AE sensors are sensitive to mounting, structural transmission paths, resonances, and background mechanical noise. A peak in AE power is therefore not automatically a direct measure of bubble-collapse energy. It is a sensor-path-weighted response to boiling-induced elastic waves. The hydrophone, by contrast, measures pressure/acoustic activity in the liquid but also has its own frequency response and placement sensitivity. The value of using both sensors is not that either one is perfect, but that common features across both channels are more likely to be physically meaningful.
+
+The AE and hydrophone results are consistent with prior acoustic boiling studies. Tang et al. [tang_2018_sound_emission_subcooled_pool] reported that MEB sound contains identifiable spectral peaks, while Ono et al. [ono_2023_acoustic_state_detection_meb] showed that acoustic features can classify MEB states. The present work extends this logic by aligning acoustic metrics with reconstructed wall temperature and heat flux. That alignment is needed if acoustic sensing is to be used for mechanistic interpretation rather than only regime classification.
+
+**Figure 5. AE waveform diagnostics for the developed high-power cases.** Each case should include an AE spectrogram, band-integrated AE power, and characteristic frequencies. The caption should state the AE channel, sampling assumptions, and frequency band used for integration.
+
+### 3.5 Asymptotic envelope analysis quantifies how the oscillatory state develops
+
+Figure 6 shows the oscillation-envelope analysis for Cases C and D. The smoothed thermal envelopes are fitted well by the asymptotic growth model, while the acoustic-power envelopes are more intermittent. The fitted values are summarized in Table 2.
+
+**Table 2. Asymptotic envelope metrics for the developed high-power cases.**
 
 | Case | Signal | Percent change (%) | `tau` (s) | Saturation fraction at window end | R^2 |
 | --- | --- | ---: | ---: | ---: | ---: |
-| Boiling-416 | `T_w` | 2042 | 103.4 | 0.974 | 0.970 |
-| Boiling-416 | `q''` | 1531 | 105.8 | 0.972 | 0.963 |
-| Boiling-416 | Hydrophone power | 313 | 769.9 | 0.388 | 0.848 |
-| Boiling-417 | `T_w` | 167 | 239.1 | 0.783 | 0.935 |
-| Boiling-417 | `q''` | 150 | 247.8 | 0.771 | 0.938 |
-| Boiling-417 | Hydrophone power | 140 | 7308.8 | 0.049 | 0.588 |
+| C | `T_w` | 2042 | 103.4 | 0.974 | 0.970 |
+| C | `q''` | 1531 | 105.8 | 0.972 | 0.963 |
+| C | Hydrophone power | 313 | 769.9 | 0.388 | 0.848 |
+| D | `T_w` | 167 | 239.1 | 0.783 | 0.935 |
+| D | `q''` | 150 | 247.8 | 0.771 | 0.938 |
+| D | Hydrophone power | 140 | 7308.8 | 0.049 | 0.588 |
 
-Boiling-416 approaches its fitted thermal asymptote more quickly than Boiling-417. The `T_w` and `q''` time constants in Boiling-416 are 103-106 s, and the saturation fractions are approximately 97% by the end of the analysis window. In Boiling-417, the corresponding thermal time constants are 239-248 s and the saturation fractions are 77-78% before power shutoff. This indicates that Boiling-417 is still developing toward a saturated thermal oscillation amplitude when heating ends.
+Case C reaches its fitted thermal asymptote more rapidly than Case D. The `T_w` and `q''` time constants are 103-106 s in Case C, and the saturation fractions are approximately 97% by the end of the analysis window. In Case D, the thermal time constants are 239-248 s and the saturation fractions are 77-78% before power shutoff. Thus, despite having the highest nominal power and maximum heat flux, Case D does not fully saturate its thermal oscillation envelope before heating ends.
 
-The acoustic power envelopes behave differently. Boiling-416 hydrophone power has a time constant of approximately 770 s and a saturation fraction of 39%, while Boiling-417 hydrophone power has a very long fitted time constant and a low R^2. This does not mean the acoustic signal is unimportant. Rather, it indicates that a single smooth growth-to-asymptote model is incomplete for acoustic power. The hydrophone signal is sensitive to intermittent collapses, sensor-band coupling, and burst-like events that can be synchronized with but not identical to the wall thermal envelope.
+The fitted percent change is large in Case C because the fitted initial envelope at `t_osc` is small. The more physically useful comparison is therefore the time constant and saturation fraction rather than percent change alone. The thermal `tau` values indicate how quickly the MEB-like oscillatory state develops after the first sustained peak, while the saturation fraction indicates whether the test duration is long enough to observe a quasi-steady oscillation amplitude.
 
-### 3.5 Literature comparison positions the local data as a transient diagnostics dataset
+Hydrophone power behaves differently from the thermal envelopes. In Case C, the hydrophone-power envelope grows but has a much longer time constant than the thermal signals. In Case D, the fitted hydrophone time constant is far longer than the experimental window and the R^2 is low. This result should not be treated as a failed acoustic measurement. It indicates that the band-integrated acoustic power contains intermittent bursts superimposed on slow modulation. These bursts are expected if individual vapor-collapse events vary in intensity and if the sensor band emphasizes particular collapse or structural-transmission events.
 
-Figure 7 compares the local data with the first-pass `test2_meb` literature compilation. The literature includes high-heat-flux MEB demonstrations, reduced-pressure confined boiling, open microchannel MEB, visualized MEB transitions, and acoustic state-detection studies. Reported literature heat-flux scales span a wide range, from approximately 140-320 W/cm^2 in some reduced-pressure or open-microchannel comparisons to much higher values in specialized MEB or droplet/cavitation contexts.
+Physically, the thermal envelopes likely represent the growth of the regime-scale oscillation amplitude after transition. The acoustic power envelopes represent both that slow growth and the intermittency of collapse events. This interpretation is consistent with MEB literature that links heat transfer to oscillating vapor structures and liquid motion, while also reporting strong boiling-sound signatures [horiuchi_2021_spatial_temporal_thermal_fluid; kobayashi_2022_on_homogeneity_of_vapor_bubble; tang_2023_bubble_induced_oscillating_flow].
 
-**Figure 7. First-pass MEB literature compilation and BoilingLab comparison.**  
-Source plots:  
-`literature-compiler/examples/test2_meb/summary/test2_meb_boiling_curve_comparison.png`  
-`literature-compiler/examples/test2_meb/summary/test2_meb_signature_summary.png`
+**Figure 6. Oscillation-envelope growth and saturation.** Panel groups should show detrended thermal/acoustic signals, smoothed envelopes, asymptotic fits, and normalized envelope comparisons. The figure should report `tau`, saturation fraction, and R^2 in the annotation rather than emphasizing linear slope.
 
-The comparison clarifies the role of the present dataset. Boiling-416 and Boiling-417 do not currently represent record-setting MEB heat fluxes relative to the highest values reported in the literature. Instead, they provide synchronized thermal, hydrophone, and AE measurements during an evolving MEB-like state. This is the key manuscript positioning. The novelty is not maximum heat flux alone. The novelty is the ability to define event times, track amplitude growth, compare thermal and acoustic envelopes, and distinguish slow envelope modulation from higher-frequency bubble or sound carrier dynamics.
+### 3.6 Literature comparison positions the present dataset as a diagnostics contribution
 
-### 3.6 Physical interpretation
+Figure 7 compares the present cases with the first-pass MEB literature compilation. The literature spans subcooled pool boiling, reduced-pressure confined MEB, open-microchannel MEB, visualized transition studies, acoustic state detection, and specialized high-heat-flux MEB configurations. Reported heat-flux scales range from approximately 140-320 W/cm^2 in reduced-pressure or microchannel contexts to much higher values in specialized microbubble-emission or cavitation-assisted configurations. The present high-power cases fall within the lower-to-middle part of this broad range.
 
-The synchronized increase in thermal oscillation amplitude and acoustic activity suggests that the MEB-like regime develops through progressive strengthening of vapor growth, collapse, and near-wall liquid replenishment. After the transition event, vapor structures near the wall likely become more spatially and temporally organized. Their repeated collapse draws or drives subcooled liquid toward the heated surface, increasing heat-transfer excursions while also producing acoustic bursts. As the regime develops, the thermal oscillation amplitude approaches a dynamic balance controlled by applied heat input, vapor generation, condensation, and liquid replenishment.
+This comparison is useful because it prevents overclaiming. The present dataset does not demonstrate record-setting MEB heat flux. Its contribution is the synchronized time-resolved diagnostic view: wall-temperature extrapolation, reconstructed heat flux, hydrophone power, AE waveform response, characteristic frequencies, and envelope saturation are all analyzed on consistent event windows. That combination is less common in the literature than boiling curves, visual snapshots, or acoustic classification alone.
 
-The difference between thermal and acoustic envelope behavior is physically plausible. Wall temperature and heat flux are spatially and temporally filtered by conduction through the copper block and by the thermocouple response. These quantities are therefore well suited to reveal the slow growth of the regime-scale oscillation amplitude. Hydrophone and AE signals respond more directly to impulsive collapse, pressure waves, structural transmission, and sensor bandwidth. They can show the same slow modulation while retaining intermittent bursts and high-frequency content. This explains why the thermal envelopes are well represented by the asymptotic growth model, while hydrophone power requires additional burst statistics or frequency-resolved metrics for a complete description.
+The literature comparison also identifies what should be extracted next. For heat-transfer comparison, the key quantities are MEB onset wall superheat, heat flux at onset, heat flux during stable MEB, pressure, subcooling, heater diameter or area, surface material, surface preparation, and confinement. For acoustic comparison, the key quantities are sensor type, sensor placement, bandwidth, sampling rate, frequency-definition type, spectral peak, and whether the frequency describes bubble oscillation, sound pressure, pressure fluctuation, or slow envelope modulation. Without these metadata, acoustic values from different papers can appear contradictory even when they describe different physical scales.
 
-## 4. Limitations
+**Figure 7. Literature comparison from the first-pass MEB compilation.** Panel (a) should compare heat-flux and wall-superheat points where available. Panel (b) should compare MEB signature metrics, including heat-flux scale and frequency scale, with clear symbols for frequency type. The caption should state that the literature compilation is a screening dataset and that reported-text values require figure-level verification.
 
-The present draft should be interpreted as a strong pilot manuscript rather than a final statistically complete study. Four tests are not enough to establish universal scaling laws for MEB onset or saturation. Boiling-412 currently contributes through the multi-case heating-only comparison but does not yet have the same complete single-case summary and acoustic/envelope analysis as Boiling-416 and Boiling-417. AE waveform analysis is currently available for the two developed high-power cases, not all four tests. The literature compilation is a first-pass screening dataset and includes reported-text values and range endpoints that require figure-level validation before final submission.
+## 4. Limitations and Uncertainty
 
-Several measurement limitations should also be addressed before journal submission. Thermocouple-based wall-temperature extrapolation filters high-frequency surface fluctuations, so the thermal oscillation metrics represent low-frequency or filtered MEB development rather than true instantaneous surface-temperature oscillations. Acoustic power is reported as a band-integrated voltage-squared proxy, not calibrated acoustic pressure or sound power. Sensor frequency response, hydrophone placement, AE coupling, and acquisition bandwidth should be documented in the final methods section. Heat losses, uncertainty propagation, and repeatability should also be quantified.
+The present manuscript is built on a small number of experiments. Four cases are enough to demonstrate the workflow and to identify differences between lower- and higher-power behavior, but they are not enough to establish a universal onset criterion or heat-transfer correlation. The two developed high-power cases carry most of the acoustic and envelope analysis. Additional repeats and intermediate power levels are needed to determine whether the observed envelope time constants are repeatable and how they scale with heat load, subcooling, pressure, and surface condition.
+
+The thermal reconstruction has its own limits. Wall temperature is extrapolated from embedded thermocouples, so high-frequency surface-temperature fluctuations are filtered by conduction through the copper block and by thermocouple response. The reconstructed heat flux should therefore be interpreted as a filtered wall heat-flux estimate rather than an instantaneous local surface heat flux. This limitation is common in conduction-based boiling measurements, but it is especially important when comparing to high-speed visual or acoustic measurements.
+
+The acoustic measurements are reported as voltage-based proxies rather than calibrated pressure or acoustic power. Hydrophone band-integrated power has units of V^2 because it is derived from the measured voltage PSD. AE waveform power is similarly sensor-path dependent. Calibration, sensor frequency response, coupling, placement, and background noise must be documented before the acoustic metrics can be compared quantitatively across laboratories. The present results are strongest for within-test synchronization and relative development, not absolute acoustic intensity.
+
+The literature compilation is also preliminary. The current dataset contains first-pass reported-text values and range endpoints. Before submission, the highest-priority MEB boiling curves and onset data should be digitized with calibrated axes, uncertainty estimates, and source-specific notes. The unpublished manuscript reviewed by the authors was used only to identify potentially relevant published references. It is not cited and does not serve as evidence in this paper.
 
 ## 5. Conclusions
 
-This work develops a reproducible multimodal workflow for diagnosing MEB-like development in subcooled pool boiling. The main conclusions are:
+This study develops and applies a synchronized thermal-acoustic workflow for diagnosing MEB-like development in subcooled pool boiling on a flat copper surface. The main conclusions are as follows.
 
-1. Heating-only boiling curves show a clear progression with applied power: maximum reconstructed heat flux increases from 142 W/cm^2 in Boiling-412 to 278 W/cm^2 in Boiling-417.
+1. Heating-only boiling curves separate lower-power reference behavior from higher-power oscillatory behavior. Maximum reconstructed heat flux increases from 142 W/cm^2 in the lowest-power case to 278 W/cm^2 in the highest-power case.
 
-2. Boiling-416 and Boiling-417 exhibit persistent thermal-acoustic oscillations after the transition event. The key event markers are `t_DNB`, `t_peak`, `t_osc`, and `t_off`, which separate the early heat-flux/temperature transition from the later oscillatory MEB-like state.
+2. Event markers identify distinct stages of the process. The DNB-associated heat-flux drop and transition wall-temperature peak occur early, while the first sustained oscillation peak occurs later and defines the start of the MEB-envelope analysis window.
 
-3. Hydrophone and AE waveform analyses give consistent low-frequency modulation for the developed cases: approximately 0.05-0.055 Hz for Boiling-416 and 0.08 Hz for Boiling-417. These values are envelope-scale modulation frequencies, not direct bubble-collapse or boiling-sound carrier frequencies.
+3. Hydrophone and AE measurements identify consistent slow envelope modulation in the developed high-power cases. The modulation frequencies are approximately 0.05-0.055 Hz in Case C and 0.08 Hz in Case D. These values describe slow regime modulation, not high-frequency bubble-collapse or boiling-sound carrier frequencies.
 
-4. Thermal oscillation envelopes are well represented by a first-order asymptotic growth model. Boiling-416 approaches saturation faster (`tau = 103-106 s`, saturation fraction near 97%) than Boiling-417 (`tau = 239-248 s`, saturation fraction near 77-78% before shutoff).
+4. Thermal oscillation envelopes are well described by a first-order asymptotic growth model. Case C reaches near-saturation within the active-heating window (`tau = 103-106 s`, saturation fraction near 97%), whereas Case D develops more slowly (`tau = 239-248 s`, saturation fraction near 77-78% before shutoff).
 
-5. Hydrophone power envelopes grow but are more intermittent than the thermal envelopes. This suggests that acoustic power contains burst-like collapse dynamics in addition to the slow development of the MEB thermal oscillation.
+5. Hydrophone power envelopes grow but remain more intermittent than the thermal envelopes. This behavior indicates that acoustic power contains burst-like collapse dynamics in addition to the slow development of the MEB-like thermal oscillation.
 
-6. The first-pass literature compilation indicates that the present dataset should be positioned as a time-resolved multimodal diagnostics study, not as a record-heat-flux study. Its value is the synchronized thermal, hydrophone, and AE view of MEB development.
+6. The first-pass literature comparison shows that the present dataset is best positioned as a multimodal diagnostics contribution rather than a record-heat-flux study. Its value is the synchronized connection among wall temperature, heat flux, hydrophone response, AE response, and envelope growth.
 
-## 6. Recommended Work Before Submission
+## 6. Work Needed Before Submission
 
-1. Complete single-case analysis for Boiling-412 with the same eight-figure output used for Boiling-416 and Boiling-417.
-2. Run AE waveform analysis for Boiling-412 and Boiling-413 if waveform files are available.
-3. Add uncertainty propagation for wall temperature, heat flux, acoustic band power, event times, and envelope fit parameters.
-4. Digitize the highest-priority MEB literature curves from Tang, Horiuchi, Kobayashi, Zhu, and Ono papers using calibrated axes and confidence scores.
-5. Separate the literature comparison into subgroups: subcooled pool MEB, reduced-pressure confined MEB, flow/open-microchannel MEB, and acoustic classification studies.
-6. Add direct video-derived bubble metrics if available, especially bubble-cycle timing, vapor structure size, and microbubble emission intensity.
-7. Decide whether the final paper should emphasize experimental diagnostics, MEB mechanism, or a literature-supported data framework. The current strongest angle is experimental diagnostics.
+Several tasks should be completed before journal submission. First, the lower-power cases should be processed with the same complete single-case workflow as the developed high-power cases if waveform files are available. Second, uncertainty propagation should be added for wall temperature, heat flux, event times, acoustic band power, characteristic frequency, and envelope-fit parameters. Third, the `test2_meb` literature compilation should be refined by digitizing MEB boiling curves and onset values from the highest-priority published papers. Fourth, final figures should be redrawn as publication panels with case labels, consistent typography, uncertainty representation where available, and captions that state the data-reduction choices.
 
 ## Data and Code Availability
 
-The analysis workflow, scripts, and generated BoilingLab figures are maintained in `UARK-NED3/BoilingLab`. The first-pass MEB literature compilation is maintained in `hanhuark/literature-compiler` under `examples/test2_meb`. Raw data are stored outside the repository in the laboratory data folder and are linked by test ID. Restricted PDFs and publisher figures are not committed.
+The analysis workflow and generated figures are maintained in the BoilingLab repository. The first-pass MEB literature compilation is maintained in the literature-compiler repository under `examples/test2_meb`. Raw experimental data are stored outside the public repository in the laboratory data archive and are linked internally by test metadata. Restricted PDFs and publisher figures are not committed.
 
-## Draft Figure List
+## Draft Figure Plan
 
-| Figure | Proposed content | Current source |
+| Figure | Proposed content | Manuscript purpose |
 | --- | --- | --- |
-| Fig. 1 | Heating-only boiling curves for Boiling-412, 413, 416, 417 | `demos/Boiling-412-413-416-417/generated/plots/` |
-| Fig. 2 | Boiling-417 heat flux and temperature time histories with event markers | `demos/Boiling-417/generated/plots/` |
-| Fig. 3 | Boiling-416 heat flux and temperature time histories with event markers | `demos/Boiling-416/generated/plots/` |
-| Fig. 4 | Hydrophone spectrogram, band-integrated power, characteristic frequencies | `demos/Boiling-416/generated/plots/`, `demos/Boiling-417/generated/plots/` |
-| Fig. 5 | AE spectrogram, band-integrated power, characteristic frequencies | `demos/Boiling-416/generated/plots/`, `demos/Boiling-417/generated/plots/` |
-| Fig. 6 | MEB oscillation envelope analysis and normalized comparison | `demos/Boiling-416/generated/plots/`, `demos/Boiling-417/generated/plots/` |
-| Fig. 7 | Literature-compiler `test2_meb` comparison and signature summary | `literature-compiler/examples/test2_meb/summary/` |
+| Fig. 1 | Heating-only boiling curves for Cases A-D | Establish power sweep and heat-flux range |
+| Fig. 2 | Case D heat flux, power load, and temperature time histories | Demonstrate full event sequence in the highest-power case |
+| Fig. 3 | Case C heat flux, power load, and temperature time histories | Compare high-power cases and motivate envelope analysis |
+| Fig. 4 | Hydrophone spectrogram, band-integrated power, and characteristic frequencies | Show liquid acoustic response and slow power modulation |
+| Fig. 5 | AE spectrogram, band-integrated power, and characteristic frequencies | Confirm modulation through a second acoustic pathway |
+| Fig. 6 | Oscillation envelope analysis and normalized envelope comparison | Quantify growth, saturation, and acoustic intermittency |
+| Fig. 7 | Literature-compiler MEB comparison | Position the local data against published MEB ranges and diagnostics |
 
 ## References
 
-Zeigarnik, Y. A., Platonov, D. N., Khodakov, K. A., and Shekhter, Y. L. (2012). The nature of microbubble emission under subcooled water boiling. *High Temperature*. https://doi.org/10.1134/S0018151X12010208
-
-Zhu, G., Sun, L., Tang, J., Mo, Z., and Liu, H. (2014). A visualized study of micro-bubble emission boiling. *International Communications in Heat and Mass Transfer*. https://doi.org/10.1016/j.icheatmasstransfer.2014.10.003
-
 Ando, J., Horiuchi, K., Saiki, T., Kaneko, T., and Ueno, I. (2016). Transition process leading to microbubble emission boiling on horizontal circular heated surface in subcooled pool. *International Journal of Heat and Mass Transfer*. https://doi.org/10.1016/j.ijheatmasstransfer.2016.05.050
 
-Inada, S., Shinagawa, K., Illias, S. B., Sumiya, H., and Jalaludin, H. A. (2016). Micro-bubble emission boiling with the cavitation bubble blow pit. *Scientific Reports*. https://doi.org/10.1038/srep33454
+Baek, W. P., et al. (2017). Acoustic emission monitoring of water boiling on fuel cladding surface at 1 bar and 130 bar. *Measurement*. https://doi.org/10.1016/j.measurement.2017.05.042
 
-Tang, J., Xie, G., Bao, J., Mo, Z., Liu, H., and Du, M. (2018). Experimental study of sound emission in subcooled pool boiling on a small heating surface. *Chemical Engineering Science*. https://doi.org/10.1016/j.ces.2018.05.002
+Brennen, C. E. (2002). Fission of collapsing cavitation bubbles. *Journal of Fluid Mechanics*, 472, 153-166.
 
-Tang, J., Sun, L., Du, M., Liu, H., Mo, Z., and Bao, J. (2019). Experimental investigation of transition process from nucleate boiling to microbubble emission boiling under transient heating modes. *AIChE Journal*. https://doi.org/10.1002/aic.16555
+Carey, V. P. (2020). *Liquid-Vapor Phase-Change Phenomena: An Introduction to the Thermophysics of Vaporization and Condensation Processes in Heat Transfer Equipment* (3rd ed.). CRC Press.
 
-Sinha, K. N. R., Kumar, V., Kumar, N., Thakur, A., and Raj, R. (2021). Deep learning the sound of boiling for advance prediction of boiling crisis. *Cell Reports Physical Science*. https://doi.org/10.1016/j.xcrp.2021.100382
+Elele, E., et al. (2018). Single-bubble water boiling on small heater under Earth's and low gravity. *npj Microgravity*. https://doi.org/10.1038/s41526-018-0055-y
+
+Gunther, F. C., and Kreith, F. (1950). Photographic study of bubble formation in heat transfer to subcooled water. Jet Propulsion Laboratory Progress Report.
 
 Horiuchi, K., et al. (2021). Spatial-temporal thermal-fluid behaviors of microbubble emission boiling (MEB). *AIChE Journal*. https://doi.org/10.1002/aic.17193
 
-Unno, N., Noma, R., Yuki, K., Satake, S., and Suzuki, K. (2022). Effects of surface properties on wall superheat at the onset of microbubble emission boiling. *International Journal of Multiphase Flow*. https://doi.org/10.1016/j.ijmultiphaseflow.2022.104196
+Inada, S., Miyasaka, Y., Izumi, R., and Owase, Y. (1981). A study on boiling curves in subcooled pool boiling. *Transactions of the Japan Society of Mechanical Engineers*, 47, 852-861.
 
-Kobayashi, N., et al. (2022). On homogeneity of vapor bubbles' oscillation and corresponding heat transfer characteristics and boiling sound in microbubble emission boiling (MEB). *International Journal of Heat and Mass Transfer*. https://doi.org/10.1016/j.ijheatmasstransfer.2022.122564
+Inada, S., Shinagawa, K., Illias, S. B., Sumiya, H., and Jalaludin, H. A. (2016). Micro-bubble emission boiling with the cavitation bubble blow pit. *Scientific Reports*. https://doi.org/10.1038/srep33454
+
+Ivey, H. J., and Morris, D. J. (1966). Critical heat flux of saturation and subcooled pool boiling in water at atmospheric pressure. Third International Heat Transfer Conference.
+
+Kawakami, T., et al. (2025). High-frequency oscillation of coalesced vapor bubbles and resultant ambient liquid motion in microbubble emission boiling in subcooled pool. *International Journal of Heat and Mass Transfer*. https://doi.org/10.1016/j.ijheatmasstransfer.2025.126832
+
+Kobayashi, H., Hayashi, M., Kurose, K., and Ueno, I. (2022). On homogeneity of vapor bubbles' oscillation and corresponding heat transfer characteristics and boiling sound in microbubble emission boiling (MEB). *International Journal of Heat and Mass Transfer*. https://doi.org/10.1016/j.ijheatmasstransfer.2022.122564
+
+Li, X., Tang, J. G., Hu, R., Sun, L. C., and Bao, J. J. (2022). Investigation on interaction between an oscillating vapor film and its surrounding liquid in microbubble emission boiling. *Applied Thermal Engineering*. https://doi.org/10.1016/j.applthermaleng.2022.119012
+
+Liang, G., and Mudawar, I. (2018). Pool boiling critical heat flux (CHF) - Part 1: Review of mechanisms, models, and correlations. *International Journal of Heat and Mass Transfer*, 117, 1352-1367.
+
+Litvintsova, A., et al. (2020). Diagnostics of coolant boiling onset based on the analysis of fluctuations of thermohydraulic parameters. *Journal of Physics: Conference Series*. https://doi.org/10.1088/1742-6596/1689/1/012042
+
+Liu, P., et al. (2020). Enhanced nucleate pool boiling by coupling the pinning act and cluster bubble nucleation of micro-nano composited surfaces. *International Journal of Heat and Mass Transfer*. https://doi.org/10.1016/j.ijheatmasstransfer.2020.119979
+
+Mao, Y., et al. (2021). A critical review on measures to suppress flow boiling instabilities in microchannels. *Heat and Mass Transfer*. https://doi.org/10.1007/s00231-020-03009-2
 
 Ono, J., Aoki, Y., Unno, N., Yuki, K., Suzuki, K., Ueki, Y., and Satake, S. (2023). Acoustic state detection of microbubble emission boiling using a deep neural network based on cepstrum analysis. *International Journal of Multiphase Flow*. https://doi.org/10.1016/j.ijmultiphaseflow.2023.104512
 
+Sinha, K. N. R., Kumar, V., Kumar, N., Thakur, A., and Raj, R. (2020). Simultaneous audio-visual-thermal characterization of transition boiling regime. *Experimental Thermal and Fluid Science*. https://doi.org/10.1016/j.expthermflusci.2020.110162
+
+Sinha, K. N. R., Kumar, V., Kumar, N., Thakur, A., and Raj, R. (2021). Deep learning the sound of boiling for advance prediction of boiling crisis. *Cell Reports Physical Science*. https://doi.org/10.1016/j.xcrp.2021.100382
+
 Tang, J., Li, X., Xu, L., and Sun, L. (2023). Bubble-induced oscillating flow in microbubble emission boiling under highly subcooled conditions. *Journal of Fluid Mechanics*. https://doi.org/10.1017/jfm.2023.285
+
+Tang, J., Sun, L., Du, M., Liu, H., Mo, Z., and Bao, J. (2019). Experimental investigation of transition process from nucleate boiling to microbubble emission boiling under transient heating modes. *AIChE Journal*. https://doi.org/10.1002/aic.16555
+
+Tang, J., Xie, G., Bao, J., Mo, Z., Liu, H., and Du, M. (2018). Experimental study of sound emission in subcooled pool boiling on a small heating surface. *Chemical Engineering Science*. https://doi.org/10.1016/j.ces.2018.05.002
+
+Unno, N., Noma, R., Yuki, K., Satake, S., and Suzuki, K. (2022). Effects of surface properties on wall superheat at the onset of microbubble emission boiling. *International Journal of Multiphase Flow*. https://doi.org/10.1016/j.ijmultiphaseflow.2022.104196
 
 Unno, N., Yuki, K., and Suzuki, K. (2025). Onset of microbubble emission boiling at reduced pressure using a confined vessel for subcooled pool boiling. *International Journal of Heat and Mass Transfer*. https://doi.org/10.1016/j.ijheatmasstransfer.2024.126600
 
+Ueki, Y., et al. (2024). Acoustic state sensing of subcooled boiling heat transfer on a CuCrZr surface using a deep neural network for divertor application. *Fusion Science and Technology*. https://doi.org/10.1080/15361055.2024.2435193
+
+Zeigarnik, Y. A., Platonov, D. N., Khodakov, K. A., and Shekhter, Y. L. (2012). The nature of microbubble emission under subcooled water boiling. *High Temperature*. https://doi.org/10.1134/S0018151X12010208
+
 Zhao, Q., Lu, M., Zhang, Y., Li, Q., and Chen, X. (2025). Flow microbubble emission boiling (MEB) in open microchannels for durable and efficient heat dissipation. *International Journal of Heat and Mass Transfer*. https://doi.org/10.1016/j.ijheatmasstransfer.2024.126506
+
+Zhu, G., Sun, L., Tang, J., Mo, Z., and Liu, H. (2014). A visualized study of micro-bubble emission boiling. *International Communications in Heat and Mass Transfer*. https://doi.org/10.1016/j.icheatmasstransfer.2014.10.003
+
+Zuber, N. (1958). On the stability of boiling heat transfer. *Transactions of the ASME*, 80, 711-714.
+
+Zuber, N. (1959). Hydrodynamic aspects of boiling heat transfer. University of California, Los Angeles.
