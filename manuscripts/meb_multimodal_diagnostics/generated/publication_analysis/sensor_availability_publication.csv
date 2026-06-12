@@ -1,5 +1,5 @@
 case,thermal_available,hydrophone_intermediate_available,ae_waveform_available,notes
-Case A,True,False,False,No AE waveform file available for this case.
+Case A,True,True,False,No AE waveform file available for this case.
 Case B,True,True,False,No AE waveform file available for this case.
 Case C,True,True,True,AE waveform analysis limited to Cases C-D.
 Case D,True,True,True,AE waveform analysis limited to Cases C-D.

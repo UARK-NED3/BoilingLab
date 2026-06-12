@@ -197,6 +197,60 @@ def write_envelope_summary(
     return envelope
 
 
+def write_uncertainty_diagnostics(
+    output_dir: Path,
+    summaries: dict[str, dict[str, object]],
+    repo_root: Path,
+    multi_summary: pd.DataFrame,
+) -> pd.DataFrame:
+    rows = []
+    multi_by_id = {str(row["test_id"]): row for _, row in multi_summary.iterrows()}
+    for test_id in CASE_ORDER:
+        summary = summaries[test_id]
+        row = multi_by_id[test_id]
+        case_dir = repo_root / "demos" / test_id / "generated"
+        hydro_power_path = case_dir / "hydrophone_band_integrated_power.csv"
+        hydro_freq_path = case_dir / "hydrophone_characteristic_frequencies.csv"
+
+        hydro_power_cv = np.nan
+        hydro_time_bin_s = np.nan
+        if hydro_power_path.exists():
+            hydro_power = pd.read_csv(hydro_power_path)
+            power = hydro_power["Band-integrated hydrophone power proxy (V^2)"].to_numpy(dtype=float)
+            time = hydro_power["Time (s)"].to_numpy(dtype=float)
+            mean_power = float(np.nanmean(power))
+            hydro_power_cv = float(np.nanstd(power) / mean_power) if mean_power else np.nan
+            hydro_time_bin_s = float(np.nanmedian(np.diff(time))) if len(time) > 1 else np.nan
+
+        centroid_iqr_hz = np.nan
+        peak_iqr_hz = np.nan
+        if hydro_freq_path.exists():
+            hydro_freq = pd.read_csv(hydro_freq_path)
+            centroid = hydro_freq["Spectral centroid (Hz)"].to_numpy(dtype=float)
+            peak = hydro_freq["Peak frequency (Hz)"].to_numpy(dtype=float)
+            centroid_iqr_hz = float(np.nanpercentile(centroid, 75) - np.nanpercentile(centroid, 25))
+            peak_iqr_hz = float(np.nanpercentile(peak, 75) - np.nanpercentile(peak, 25))
+
+        rows.append(
+            {
+                "case": case_label(test_id),
+                "nominal_power_W": CASE_MAP[test_id]["power_W"],
+                "pressure_std_kPa": row["pressure_std_kPa"],
+                "temperature_heat_flux_fit_mean_R2": summary.get("mean_R2_linear_fit", np.nan),
+                "temperature_heat_flux_fit_min_R2": summary.get("min_R2_linear_fit", np.nan),
+                "hydrophone_band_power_cv": hydro_power_cv,
+                "hydrophone_time_bin_s": hydro_time_bin_s,
+                "hydrophone_centroid_iqr_Hz": centroid_iqr_hz,
+                "hydrophone_peak_frequency_iqr_Hz": peak_iqr_hz,
+                "ae_waveform_available": bool(summary.get("ae_wfs_available", False)),
+                "note": "Data-derived diagnostic; add manufacturer/calibration uncertainty before submission.",
+            }
+        )
+    diagnostics = pd.DataFrame(rows)
+    diagnostics.to_csv(output_dir / "uncertainty_diagnostics_publication.csv", index=False)
+    return diagnostics
+
+
 def plot_boiling_curves(repo_root: Path, plots_dir: Path) -> None:
     curves_path = repo_root / "demos" / "Boiling-412-413-416-417" / "generated" / "curves.csv"
     curves = pd.read_csv(curves_path)
@@ -407,12 +461,102 @@ def plot_literature_comparison(
     plt.close(fig)
 
 
+def write_literature_digitization_priority(output_dir: Path) -> pd.DataFrame:
+    rows = [
+        {
+            "priority": 1,
+            "ref_id": "tang_2016_transition_to_meb",
+            "target_data": "MEB transition heat flux, wall superheat, bubble-collapse/growth frequency",
+            "figure_or_table_target": "transition boiling curves and microbubble tracking figures",
+            "submission_use": "Primary comparison for transition from nucleate boiling to MEB",
+            "status": "needs figure-level digitization",
+        },
+        {
+            "priority": 1,
+            "ref_id": "horiuchi_2019_transient_nucleate_to_meb",
+            "target_data": "Transient MEB onset heat flux and wall superheat",
+            "figure_or_table_target": "reported transition/onset data and transient boiling curves",
+            "submission_use": "Compare event markers and transient heating pathway",
+            "status": "needs figure-level digitization",
+        },
+        {
+            "priority": 1,
+            "ref_id": "horiuchi_2021_spatial_temporal_thermal_fluid",
+            "target_data": "C-MEB/S-MEB heat flux ranges, wall superheat ranges, sound frequencies",
+            "figure_or_table_target": "MEB state map, heat-flux ranges, sound-frequency figures",
+            "submission_use": "Interpret oscillatory state and frequency definitions",
+            "status": "needs range verification",
+        },
+        {
+            "priority": 1,
+            "ref_id": "ono_2023_acoustic_state_detection_meb",
+            "target_data": "Acoustic state labels, hydrophone sampling/bandwidth, heat flux range",
+            "figure_or_table_target": "state-detection and heat-transfer condition tables",
+            "submission_use": "Benchmark acoustic-classification context",
+            "status": "needs table/figure verification",
+        },
+        {
+            "priority": 2,
+            "ref_id": "kobayashi_2022_on_homogeneity_of_vapor_bubble",
+            "target_data": "Boiling sound frequency, vapor-bubble oscillation homogeneity, heat-transfer state",
+            "figure_or_table_target": "boiling sound and heat-transfer characteristic figures",
+            "submission_use": "Separate high-frequency sound/bubble metrics from slow envelope modulation",
+            "status": "needs frequency-definition verification",
+        },
+        {
+            "priority": 2,
+            "ref_id": "tang_2018_sound_emission_subcooled_pool",
+            "target_data": "Sound spectral peaks, subcooling, heater size, boiling state",
+            "figure_or_table_target": "sound-emission spectra and boiling-condition tables",
+            "submission_use": "Hydrophone/sound comparison for spectral content",
+            "status": "needs source-key/name verification and figure digitization",
+        },
+        {
+            "priority": 2,
+            "ref_id": "zhu_2014_visualized_meb",
+            "target_data": "Visualized MEB heat flux, subcooling, boiling-sound peak",
+            "figure_or_table_target": "visualized MEB condition figures and sound result",
+            "submission_use": "Mechanistic visualization context",
+            "status": "needs figure-level digitization",
+        },
+        {
+            "priority": 2,
+            "ref_id": "unno_2022_surface_properties_meb_onset",
+            "target_data": "MEB onset wall superheat versus surface condition",
+            "figure_or_table_target": "onset wall-superheat plots/tables",
+            "submission_use": "Surface-condition sensitivity and onset comparison",
+            "status": "needs source-specific uncertainty notes",
+        },
+        {
+            "priority": 2,
+            "ref_id": "unno_2025_reduced_pressure_confined_meb",
+            "target_data": "Reduced-pressure confined-vessel MEB onset pressure and heat-transfer condition",
+            "figure_or_table_target": "reduced-pressure onset figures/tables",
+            "submission_use": "Compare subatmospheric/reduced-pressure relevance",
+            "status": "needs figure-level digitization",
+        },
+        {
+            "priority": 3,
+            "ref_id": "zhao_2025_open_microchannel_meb",
+            "target_data": "Flow MEB heat flux and wall superheat in open microchannels",
+            "figure_or_table_target": "microchannel boiling curves and durability plots",
+            "submission_use": "Context only; different geometry from pool boiling",
+            "status": "needs geometry-separated extraction",
+        },
+    ]
+    table = pd.DataFrame(rows)
+    table.to_csv(output_dir / "literature_digitization_priority_publication.csv", index=False)
+    return table
+
+
 def write_summary_markdown(
     output_dir: Path,
     availability: pd.DataFrame,
     case_summary: pd.DataFrame,
     hydro_summary: pd.DataFrame,
     ae_summary: pd.DataFrame,
+    uncertainty_diagnostics: pd.DataFrame,
+    digitization_priority: pd.DataFrame,
 ) -> None:
     def markdown_table(frame: pd.DataFrame, float_format: str | None = None) -> str:
         if frame.empty:
@@ -447,7 +591,7 @@ def write_summary_markdown(
         markdown_table(availability),
         "",
         "Thermal comparison is available for all four cases. Hydrophone analysis is",
-        "included where generated hydrophone intermediate CSV files are present.",
+        "available for all four cases after regenerating Case A from raw data.",
         "AE waveform analysis is intentionally limited to Cases C and D because those",
         "are the only cases with AE waveform files available in the current dataset.",
         "",
@@ -478,9 +622,71 @@ def write_summary_markdown(
             "",
             markdown_table(ae_summary, ".3g") if not ae_summary.empty else "No AE waveform rows found.",
             "",
+            "## First-pass uncertainty and quality diagnostics",
+            "",
+            markdown_table(uncertainty_diagnostics, ".3g"),
+            "",
+            "## Literature digitization priority",
+            "",
+            markdown_table(digitization_priority),
+            "",
         ]
     )
     (output_dir / "README.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_analysis_history(output_dir: Path) -> None:
+    plots = [
+        "plots/fig01a_boiling_curve_wall_temperature.png",
+        "plots/fig01b_boiling_curve_wall_superheat.png",
+        "plots/fig02_thermal_hydrophone_four_case_summary.png",
+        "plots/fig06_envelope_metric_summary.png",
+        "plots/fig07a_literature_boiling_curve_comparison.png",
+        "plots/fig07b_literature_frequency_scale_comparison.png",
+    ]
+    text = [
+        "# Analysis History",
+        "",
+        "This file records reproducible analysis steps and intermediate outputs used to update the manuscript. It is an audit trail of commands, data coverage, and interpretation checkpoints.",
+        "",
+        "## 2026-06-12 pre-submission update",
+        "",
+        "1. Regenerated Case A single-case outputs after the raw-data drive was mounted.",
+        "",
+        "```powershell",
+        "python scripts\\run_single_case_demo.py --test-id Boiling-412 --raw-root \"Y:\\0_Ishraq\\New Pool Boiling Video\" --applied-heat-load 150 --subcooling 40 --skip-wfs",
+        "```",
+        "",
+        "Key result: Case A now has hydrophone spectrogram, band-integrated power, characteristic-frequency CSV, and related hydrophone plots. AE waveform analysis remains unavailable for Cases A-B because waveform files are not present.",
+        "",
+        "2. Refreshed publication-facing manuscript tables and figures.",
+        "",
+        "```powershell",
+        "python scripts\\run_manuscript_publication_analysis.py",
+        "```",
+        "",
+        "3. Generated/updated these manuscript-facing plots:",
+        "",
+    ]
+    text.extend(f"- `{plot}`" for plot in plots)
+    text.extend(
+        [
+            "",
+            "4. Data-coverage checkpoint:",
+            "",
+            "- Thermal comparison: Cases A-D.",
+            "- Hydrophone comparison: Cases A-D after Case A regeneration.",
+            "- AE waveform comparison: Cases C-D only.",
+            "- Literature comparison: first-pass `test2_meb` compilation; still needs final figure/table digitization and source-specific uncertainty notes before submission.",
+            "- A source-by-source digitization queue is saved as `literature_digitization_priority_publication.csv`.",
+            "",
+            "5. Uncertainty checkpoint:",
+            "",
+            "A first-pass data-derived uncertainty/quality diagnostics table was generated as `uncertainty_diagnostics_publication.csv`. It includes pressure stability, thermal linear-fit diagnostics, hydrophone power variability, hydrophone time-bin spacing, and frequency-spread diagnostics. Manufacturer calibration and full uncertainty propagation remain a pre-submission task.",
+            "",
+        ]
+    )
+    (output_dir / "analysis_history.md").write_text("\n".join(text), encoding="utf-8")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -512,6 +718,7 @@ def main() -> None:
     availability = write_sensor_availability(output_dir, summaries, repo_root)
     hydro_summary, ae_summary = write_acoustic_summary(output_dir, summaries, repo_root)
     envelope = write_envelope_summary(output_dir, repo_root)
+    uncertainty_diagnostics = write_uncertainty_diagnostics(output_dir, summaries, repo_root, multi_summary)
 
     plot_boiling_curves(repo_root, plots_dir)
     plot_four_case_summary(case_summary, hydro_summary, plots_dir)
@@ -519,8 +726,18 @@ def main() -> None:
 
     combined, signatures = load_literature_tables(literature_root)
     plot_literature_comparison(combined, signatures, plots_dir, output_dir)
+    digitization_priority = write_literature_digitization_priority(output_dir)
 
-    write_summary_markdown(output_dir, availability, case_summary, hydro_summary, ae_summary)
+    write_summary_markdown(
+        output_dir,
+        availability,
+        case_summary,
+        hydro_summary,
+        ae_summary,
+        uncertainty_diagnostics,
+        digitization_priority,
+    )
+    write_analysis_history(output_dir)
     print(f"Wrote publication analysis to {output_dir}")
 
 
