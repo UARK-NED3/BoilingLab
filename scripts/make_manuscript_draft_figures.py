@@ -29,10 +29,10 @@ CASE_LABELS = {
     "Boiling-417": r"$P_{\mathrm{load}}$ = 250 W",
 }
 CASE_COLORS = {
-    "Boiling-412": "#3B6688",
-    "Boiling-413": "#756483",
-    "Boiling-416": "#BF6B85",
-    "Boiling-417": "#F2697A",
+    "Boiling-412": "#1f77b4",
+    "Boiling-413": "#ff7f0e",
+    "Boiling-416": "#2ca02c",
+    "Boiling-417": "#d62728",
 }
 CASE_BY_POWER_LABEL = {label: test_id for test_id, label in CASE_LABELS.items()}
 SOURCE_LABELS = {
@@ -115,14 +115,16 @@ def add_event_lines(ax: plt.Axes, summary: dict[str, object]) -> None:
 
 
 def add_external_panel_label(fig: plt.Figure, ax: plt.Axes, label: str) -> None:
-    bbox = ax.get_position()
-    fig.text(
-        max(0.004, bbox.x0 - 0.052),
-        min(0.992, bbox.y1 + 0.006),
+    ax.annotate(
         label,
+        xy=(0.0, 1.0),
+        xycoords="axes fraction",
+        xytext=(-30, 8),
+        textcoords="offset points",
         ha="left",
         va="bottom",
         fontsize=10,
+        annotation_clip=False,
     )
 
 
@@ -156,6 +158,49 @@ def figure_1_boiling_curves(repo_root: Path, output_dir: Path) -> None:
     axes[1].legend(frameon=False, ncol=1, loc="best")
     add_external_panel_labels(fig, axes)
     save_png_pdf(fig, output_dir / "fig01_heating_boiling_curves")
+
+
+def figure_1b_hysteresis_boiling_curves(raw_root: Path, repo_root: Path, output_dir: Path) -> None:
+    fig, axes = plt.subplots(1, 2, figsize=(7.25, 3.25), constrained_layout=True)
+    for test_id in CASE_IDS:
+        summary = load_summary(repo_root, test_id)
+        data = load_thermal_case(raw_root, test_id)
+        t_off = float(summary.get("dc_shutoff_time_s", np.nan))
+        if not np.isfinite(t_off):
+            power_on = np.interp(data["time_s"], data["dc_time_s"], data["dc_power_W"], left=0.0, right=0.0) > 0.0
+            t_off = float(np.nanmax(data["time_s"][power_on])) if np.any(power_on) else float(np.nanmax(data["time_s"]))
+        heating = data["time_s"] < t_off
+        cooling = ~heating
+        wall_superheat = data["surface_temperature_C"] - float(summary.get("T_sat_C", np.nan))
+        label = CASE_LABELS[test_id]
+        color = CASE_COLORS[test_id]
+        for ax, x in zip(axes, [data["surface_temperature_C"], wall_superheat]):
+            ax.plot(
+                x[heating],
+                data["heat_flux_W_cm2"][heating],
+                color=color,
+                linestyle="-",
+                linewidth=1.5,
+                label=f"{label}, heating",
+            )
+            if np.any(cooling):
+                ax.plot(
+                    x[cooling],
+                    data["heat_flux_W_cm2"][cooling],
+                    color=color,
+                    linestyle="--",
+                    linewidth=1.2,
+                    alpha=0.9,
+                    label=f"{label}, cooling",
+                )
+    axes[0].set_xlabel(r"Wall temperature, $T_{\mathrm{w}}$ ($^\circ$C)")
+    axes[1].set_xlabel(r"Wall superheat, $\Delta T_{\mathrm{w}}$ (K)")
+    for ax in axes:
+        ax.set_ylabel(r"Heat flux, $q^{\prime\prime}$ (W cm$^{-2}$)")
+        ax.grid(True, linestyle=":", alpha=0.45)
+    axes[1].legend(frameon=False, ncol=1, loc="best", fontsize=5.6)
+    add_external_panel_labels(fig, axes)
+    save_png_pdf(fig, output_dir / "fig01b_full_history_boiling_curves")
 
 
 def figure_thermal_case(raw_root: Path, repo_root: Path, output_dir: Path, test_id: str, figure_name: str) -> None:
@@ -222,8 +267,8 @@ def load_power_and_frequency(repo_root: Path, test_id: str, prefix: str) -> tupl
 
 
 def figure_4_hydrophone(repo_root: Path, output_dir: Path) -> None:
-    fig, axes = plt.subplots(2, 2, figsize=(7.25, 5.2), constrained_layout=True)
-    for ax, test_id in zip(axes[0], ["Boiling-416", "Boiling-417"]):
+    fig, axes = plt.subplots(3, 2, figsize=(7.25, 7.2), constrained_layout=True)
+    for ax, test_id in zip(axes[:2].ravel(), CASE_IDS):
         image = mpimg.imread(repo_root / "demos" / test_id / "generated" / "plots" / "hydrophone_spectrogram.png")
         ax.imshow(image)
         ax.axis("off")
@@ -241,22 +286,22 @@ def figure_4_hydrophone(repo_root: Path, output_dir: Path) -> None:
     for test_id in CASE_IDS:
         case = CASE_LABELS[test_id]
         power, freq = load_power_and_frequency(repo_root, test_id, "hydrophone")
-        axes[1, 0].plot(power["Time (s)"], power["power_db"], color=CASE_COLORS[test_id], linewidth=0.8, label=case)
-        axes[1, 1].plot(
+        axes[2, 0].plot(power["Time (s)"], power["power_db"], color=CASE_COLORS[test_id], linewidth=0.8, label=case)
+        axes[2, 1].plot(
             freq["Time (s)"],
             freq["Spectral centroid (Hz)"] / 1000.0,
             color=CASE_COLORS[test_id],
             linewidth=0.8,
             label=case,
         )
-    axes[1, 0].set_xlabel(r"Time, $t$ (s)")
-    axes[1, 0].set_ylabel(r"Band-integrated power (dB re V$^2$)")
-    axes[1, 1].set_xlabel(r"Time, $t$ (s)")
-    axes[1, 1].set_ylabel(r"Centroid frequency, $f_{\mathrm{c}}$ (kHz)")
-    for ax in axes[1]:
+    axes[2, 0].set_xlabel(r"Time, $t$ (s)")
+    axes[2, 0].set_ylabel(r"Band-integrated power (dB re V$^2$)")
+    axes[2, 1].set_xlabel(r"Time, $t$ (s)")
+    axes[2, 1].set_ylabel(r"Centroid frequency, $f_{\mathrm{c}}$ (kHz)")
+    for ax in axes[2]:
         ax.set_xlim(0, 800)
         ax.grid(True, linestyle=":", alpha=0.45)
-    axes[1, 1].legend(frameon=False, ncol=2, loc="best")
+    axes[2, 1].legend(frameon=False, ncol=2, loc="best")
     add_external_panel_labels(fig, axes)
     save_png_pdf(fig, output_dir / "fig04_hydrophone_diagnostics")
 
@@ -425,11 +470,13 @@ def write_caption_draft(output_dir: Path) -> None:
         "",
         "Fig. 1. Heating-only boiling curves labeled by power load. Only samples with positive DC power are included.",
         "",
+        "Fig. 1b. Full-history boiling curves labeled by power load. Solid lines show active heating before power shutoff; dashed lines show cooling after shutoff, making the hysteresis path visible.",
+        "",
         "Fig. 2. 250 W thermal time histories with heat flux, power load, embedded thermocouple temperatures, extrapolated wall temperature, and event markers.",
         "",
         "Fig. 3. 230 W thermal time histories plotted with the same format as Fig. 2.",
         "",
-        "Fig. 4. Hydrophone diagnostics. Top panels show current single-case spectrogram drafts for 230 W and 250 W; bottom panels show band-integrated hydrophone power and centroid frequency for all power loads.",
+        "Fig. 4. Hydrophone diagnostics. Top four panels show current single-case spectrogram drafts for all power loads; bottom panels show band-integrated hydrophone power and centroid frequency for all power loads.",
         "",
         "Fig. 5. AE waveform diagnostics for 230 W and 250 W only. AE is limited to these cases because waveform files are unavailable for 150 W and 180 W.",
         "",
@@ -461,6 +508,7 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     figure_1_boiling_curves(repo_root, output_dir)
+    figure_1b_hysteresis_boiling_curves(raw_root, repo_root, output_dir)
     figure_thermal_case(raw_root, repo_root, output_dir, "Boiling-417", "fig02_case_d_thermal_time_histories")
     figure_thermal_case(raw_root, repo_root, output_dir, "Boiling-416", "fig03_case_c_thermal_time_histories")
     figure_4_hydrophone(repo_root, output_dir)

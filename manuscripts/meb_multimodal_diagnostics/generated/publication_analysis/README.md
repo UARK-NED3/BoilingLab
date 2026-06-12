@@ -22,12 +22,12 @@ are the only cases with AE waveform files available in the current dataset.
 
 ## Key thermal summary
 
-| case | nominal_power_W | mean_pressure_kPa | pressure_std_kPa | mean_liquid_temperature_C | saturation_temperature_C | subcooling_K | maximum_heat_flux_W_cm2 | maximum_wall_temperature_C | heating_duration_s | mean_power_during_heating_W |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Case A | 150 | 97.3 | 0.0586 | 58.8 | 98.8 | 40 | 142 | 113 | 537 | 150 |
-| Case B | 180 | 97.3 | 0.0586 | 52.4 | 98.8 | 46.5 | 163 | 159 | 568 | 179 |
-| Case C | 230 | 97.5 | 0.0582 | 57.3 | 98.9 | 41.6 | 267 | 167 | 753 | 228 |
-| Case D | 250 | 97.5 | 0.0582 | 57.6 | 98.9 | 41.3 | 278 | 173 | 670 | 248 |
+| case | power_label | nominal_power_W | mean_pressure_kPa | pressure_std_kPa | mean_liquid_temperature_C | saturation_temperature_C | subcooling_K | maximum_heat_flux_W_cm2 | q_DNB_raw_W_cm2 | q_DNB_plot_W_cm2 | t_DNB_s | dnb_resolved_for_plot | maximum_wall_temperature_C | heating_duration_s | mean_power_during_heating_W |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Case A | $P_{\mathrm{load}}$ = 150 W | 150 | 97.3 | 0.0586 | 58.8 | 98.8 | 40 | 142 | -1.02 |  | 1.2 | False | 113 | 537 | 150 |
+| Case B | $P_{\mathrm{load}}$ = 180 W | 180 | 97.3 | 0.0586 | 52.4 | 98.8 | 46.5 | 163 | 152 | 152 | 178 | True | 159 | 568 | 179 |
+| Case C | $P_{\mathrm{load}}$ = 230 W | 230 | 97.5 | 0.0582 | 57.3 | 98.9 | 41.6 | 267 | 188 | 188 | 151 | True | 167 | 753 | 228 |
+| Case D | $P_{\mathrm{load}}$ = 250 W | 250 | 97.5 | 0.0582 | 57.6 | 98.9 | 41.3 | 278 | 191 | 191 | 125 | True | 173 | 670 | 248 |
 
 ## Hydrophone summary
 

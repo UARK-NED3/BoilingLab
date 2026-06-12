@@ -20,8 +20,10 @@ python scripts\run_manuscript_publication_analysis.py
 
 3. Generated/updated these manuscript-facing plots:
 
-- `plots/fig01a_boiling_curve_wall_temperature.png`
-- `plots/fig01b_boiling_curve_wall_superheat.png`
+- `plots/fig01a_heating_boiling_curve_wall_temperature.png`
+- `plots/fig01b_heating_boiling_curve_wall_superheat.png`
+- `plots/fig01c_full_history_boiling_curve_wall_temperature.png`
+- `plots/fig01d_full_history_boiling_curve_wall_superheat.png`
 - `plots/fig02_thermal_hydrophone_four_case_summary.png`
 - `plots/fig06_envelope_metric_summary.png`
 - `plots/fig07a_literature_boiling_curve_comparison.png`

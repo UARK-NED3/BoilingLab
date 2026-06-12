@@ -1,4 +1,4 @@
-"""Build publication-facing MEB manuscript analysis products.
+﻿"""Build publication-facing MEB manuscript analysis products.
 
 This script assembles generated BoilingLab outputs and the sibling
 literature-compiler ``test2_meb`` dataset into case-labeled tables and figures
@@ -18,6 +18,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+from run_single_case_demo import compute_temperature_quantities, parse_lvm_start_time_seconds, read_lvm
 
 
 TC_LOCATION_M = np.array([0, 2.54, 5.08, 7.62]) * 1e-3
@@ -46,10 +48,10 @@ CASE_MAP = {
 
 CASE_ORDER = list(CASE_MAP)
 CASE_COLORS = {
-    "Case A": "#355C7D",
-    "Case B": "#6C5B7B",
-    "Case C": "#C06C84",
-    "Case D": "#F67280",
+    "Case A": "#1f77b4",
+    "Case B": "#ff7f0e",
+    "Case C": "#2ca02c",
+    "Case D": "#d62728",
 }
 
 
@@ -114,10 +116,63 @@ def case_label(test_id: str) -> str:
     return CASE_MAP[test_id]["case"]
 
 
+def power_label_from_case(case: str) -> str:
+    for value in CASE_MAP.values():
+        if value["case"] == case:
+            return rf"$P_{{\mathrm{{load}}}}$ = {value['power_W']:.0f} W"
+    return case
+
+
+def power_label(test_id: str) -> str:
+    return rf"$P_{{\mathrm{{load}}}}$ = {CASE_MAP[test_id]['power_W']:.0f} W"
+
+
 def load_json(path: Path) -> dict[str, object]:
     if not path.exists():
         return {}
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_thermal_case(raw_root: Path, test_id: str) -> dict[str, np.ndarray]:
+    folder = raw_root / test_id
+    temp = read_lvm(folder, "Temperature.lvm").rename(columns={"X_Value": "Time (sec)"})
+    temp_data = compute_temperature_quantities(temp)
+    dc = read_lvm(folder, "DC_power.lvm")
+    dc_time = dc.iloc[:, 0].to_numpy(dtype=float)
+    dc_power = dc.iloc[:, -1].to_numpy(dtype=float)
+    offset = parse_lvm_start_time_seconds(folder / "DC_power.lvm") - parse_lvm_start_time_seconds(
+        folder / "Temperature.lvm"
+    )
+    dc_time = dc_time + offset
+    finite = np.isfinite(dc_time) & np.isfinite(dc_power)
+    order = np.argsort(dc_time[finite])
+    return {
+        "time_s": temp_data["time_s"],
+        "surface_temperature_C": temp_data["surface_temperature"],
+        "heat_flux_W_cm2": temp_data["heat_flux"],
+        "dc_time_s": dc_time[finite][order],
+        "dc_power_W": dc_power[finite][order],
+    }
+
+
+def add_external_panel_label(fig: plt.Figure, ax: plt.Axes, label: str) -> None:
+    ax.annotate(
+        label,
+        xy=(0.0, 1.0),
+        xycoords="axes fraction",
+        xytext=(-30, 8),
+        textcoords="offset points",
+        ha="left",
+        va="bottom",
+        fontsize=plt.rcParams.get("font.size", 8.0),
+        annotation_clip=False,
+    )
+
+
+def add_external_panel_labels(fig: plt.Figure, axes) -> None:
+    fig.canvas.draw()
+    for i, ax in enumerate(np.asarray(axes, dtype=object).ravel()):
+        add_external_panel_label(fig, ax, f"({chr(97 + i)})")
 
 
 def load_case_summaries(repo_root: Path) -> tuple[pd.DataFrame, dict[str, dict[str, object]]]:
@@ -129,13 +184,22 @@ def load_case_summaries(repo_root: Path) -> tuple[pd.DataFrame, dict[str, dict[s
     return multi_summary, summaries
 
 
-def write_publication_case_summary(output_dir: Path, multi_summary: pd.DataFrame) -> pd.DataFrame:
+def write_publication_case_summary(
+    output_dir: Path,
+    multi_summary: pd.DataFrame,
+    summaries: dict[str, dict[str, object]],
+) -> pd.DataFrame:
     rows = []
     for _, row in multi_summary.iterrows():
         test_id = str(row["test_id"])
+        summary = summaries.get(test_id, {})
+        dnb_time_s = pd.to_numeric(summary.get("dnb_time_s", np.nan), errors="coerce")
+        dnb_heat_flux = pd.to_numeric(summary.get("dnb_heat_flux_W_cm2", np.nan), errors="coerce")
+        dnb_resolved = bool(np.isfinite(dnb_time_s) and np.isfinite(dnb_heat_flux) and dnb_time_s > 20.0 and dnb_heat_flux > 0.0)
         rows.append(
             {
                 "case": case_label(test_id),
+                "power_label": power_label(test_id),
                 "nominal_power_W": CASE_MAP[test_id]["power_W"],
                 "mean_pressure_kPa": row["pressure_mean_kPa"],
                 "pressure_std_kPa": row["pressure_std_kPa"],
@@ -143,6 +207,10 @@ def write_publication_case_summary(output_dir: Path, multi_summary: pd.DataFrame
                 "saturation_temperature_C": row["T_sat_C"],
                 "subcooling_K": row["T_sat_C"] - row["mean_liquid_temp_C"],
                 "maximum_heat_flux_W_cm2": row["max_heat_flux_W_cm2"],
+                "q_DNB_raw_W_cm2": dnb_heat_flux,
+                "q_DNB_plot_W_cm2": dnb_heat_flux if dnb_resolved else np.nan,
+                "t_DNB_s": dnb_time_s,
+                "dnb_resolved_for_plot": dnb_resolved,
                 "maximum_wall_temperature_C": row["max_surface_temp_C"],
                 "heating_duration_s": row["heating_duration_s"],
                 "mean_power_during_heating_W": row["mean_dc_power_during_heating_W"],
@@ -434,14 +502,19 @@ def write_uncertainty_budget(
     return table
 
 
-def plot_boiling_curves(repo_root: Path, plots_dir: Path) -> None:
+def plot_boiling_curves(
+    repo_root: Path,
+    raw_root: Path,
+    plots_dir: Path,
+    summaries: dict[str, dict[str, object]],
+) -> None:
     curves_path = repo_root / "demos" / "Boiling-412-413-416-417" / "generated" / "curves.csv"
     curves = pd.read_csv(curves_path)
     curves["case"] = curves["test_id"].map(lambda value: case_label(str(value)))
 
     for x_col, x_label, filename in [
-        ("surface_temperature_C", r"Wall temperature, $T_{\mathrm{w}}$ (°C)", "fig01a_boiling_curve_wall_temperature.png"),
-        ("wall_superheat_C", r"Wall superheat, $\Delta T_{\mathrm{w}}$ (°C)", "fig01b_boiling_curve_wall_superheat.png"),
+        ("surface_temperature_C", r"Wall temperature, $T_{\mathrm{w}}$ ($^\circ$C)", "fig01a_heating_boiling_curve_wall_temperature.png"),
+        ("wall_superheat_C", r"Wall superheat, $\Delta T_{\mathrm{w}}$ (K)", "fig01b_heating_boiling_curve_wall_superheat.png"),
     ]:
         fig, ax = plt.subplots(figsize=(9, 8))
         for test_id in CASE_ORDER:
@@ -450,7 +523,7 @@ def plot_boiling_curves(repo_root: Path, plots_dir: Path) -> None:
             ax.plot(
                 case_curves[x_col],
                 case_curves["heat_flux_W_cm2"],
-                label=label,
+                label=power_label(test_id),
                 color=CASE_COLORS[label],
                 linewidth=2.4,
             )
@@ -462,14 +535,80 @@ def plot_boiling_curves(repo_root: Path, plots_dir: Path) -> None:
         fig.savefig(plots_dir / filename)
         plt.close(fig)
 
+    for x_key, x_label, filename in [
+        ("surface_temperature_C", r"Wall temperature, $T_{\mathrm{w}}$ ($^\circ$C)", "fig01c_full_history_boiling_curve_wall_temperature.png"),
+        ("wall_superheat_C", r"Wall superheat, $\Delta T_{\mathrm{w}}$ (K)", "fig01d_full_history_boiling_curve_wall_superheat.png"),
+    ]:
+        fig, ax = plt.subplots(figsize=(9, 8))
+        for test_id in CASE_ORDER:
+            label = case_label(test_id)
+            summary = summaries[test_id]
+            data = load_thermal_case(raw_root, test_id)
+            t_off = pd.to_numeric(summary.get("dc_shutoff_time_s", np.nan), errors="coerce")
+            if not np.isfinite(t_off):
+                power_on = np.interp(data["time_s"], data["dc_time_s"], data["dc_power_W"], left=0.0, right=0.0) > 0.0
+                t_off = float(np.nanmax(data["time_s"][power_on])) if np.any(power_on) else float(np.nanmax(data["time_s"]))
+            x_values = data["surface_temperature_C"]
+            if x_key == "wall_superheat_C":
+                x_values = x_values - float(summary.get("T_sat_C", np.nan))
+            heating = data["time_s"] < float(t_off)
+            cooling = ~heating
+            ax.plot(
+                x_values[heating],
+                data["heat_flux_W_cm2"][heating],
+                color=CASE_COLORS[label],
+                linestyle="-",
+                linewidth=2.6,
+                label=f"{power_label(test_id)}, heating",
+            )
+            if np.any(cooling):
+                ax.plot(
+                    x_values[cooling],
+                    data["heat_flux_W_cm2"][cooling],
+                    color=CASE_COLORS[label],
+                    linestyle="--",
+                    linewidth=2.0,
+                    alpha=0.9,
+                    label=f"{power_label(test_id)}, cooling",
+                )
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(r"Heat flux, $q^{\prime\prime}$ (W/cm$^2$)")
+        ax.grid(True, linestyle="--", alpha=0.35)
+        ax.legend(frameon=False, loc="best", fontsize=9)
+        fig.tight_layout()
+        fig.savefig(plots_dir / filename)
+        plt.close(fig)
+
 
 def plot_four_case_summary(case_summary: pd.DataFrame, hydro_summary: pd.DataFrame, plots_dir: Path) -> None:
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.0), constrained_layout=True)
     colors = [CASE_COLORS[c] for c in case_summary["case"]]
-    axes[0].bar(case_summary["case"], case_summary["maximum_heat_flux_W_cm2"], color=colors)
-    axes[0].set_ylabel(r"Maximum heat flux, $q^{\prime\prime}_{\max}$ (W/cm$^2$)")
-    axes[0].set_xlabel("Case")
+    x = np.arange(len(case_summary))
+    width = 0.36
+    axes[0].bar(
+        x - width / 2,
+        case_summary["maximum_heat_flux_W_cm2"],
+        width=width,
+        color=colors,
+        label=r"$q^{\prime\prime}_{\max}$",
+    )
+    axes[0].bar(
+        x + width / 2,
+        case_summary["q_DNB_plot_W_cm2"],
+        width=width,
+        color=colors,
+        alpha=0.45,
+        hatch="//",
+        label=r"$q^{\prime\prime}_{\mathrm{DNB}}$",
+    )
+    for _, row in case_summary[~case_summary["dnb_resolved_for_plot"]].iterrows():
+        index = int(case_summary.index[case_summary["case"] == row["case"]][0])
+        axes[0].text(index + width / 2, 8, "not resolved", rotation=90, ha="center", va="bottom", fontsize=9)
+    axes[0].set_xticks(x)
+    axes[0].set_xticklabels(case_summary["power_label"], rotation=15, ha="right")
+    axes[0].set_ylabel(r"Heat flux, $q^{\prime\prime}$ (W/cm$^2$)")
     axes[0].grid(True, axis="y", linestyle="--", alpha=0.3)
+    axes[0].legend(frameon=False, loc="best")
 
     hydro = hydro_summary.copy()
     hydro["dominant_slow_modulation_Hz"] = pd.to_numeric(
@@ -484,10 +623,10 @@ def plot_four_case_summary(case_summary: pd.DataFrame, hydro_summary: pd.DataFra
                 row["dominant_slow_modulation_Hz"],
                 s=80,
                 color=color,
-                label=row["case"],
+                label=power_label_from_case(row["case"]),
             )
         else:
-            missing_cases.append(row["case"])
+            missing_cases.append(power_label_from_case(row["case"]))
     axes[1].set_xlabel(r"Nominal power, $P_{\mathrm{load}}$ (W)")
     axes[1].set_ylabel("Dominant hydrophone slow modulation (Hz)")
     axes[1].grid(True, linestyle="--", alpha=0.3)
@@ -673,28 +812,46 @@ def plot_final_ate_panels(
     }
     with plt.rc_context(panel_style):
         fig, axes = plt.subplots(1, 2, figsize=(7.25, 3.25), constrained_layout=True)
-        axes[0].text(0.02, 0.98, "(a)", transform=axes[0].transAxes, ha="left", va="top")
+        x_cases = np.arange(len(case_summary))
+        bar_width = 0.36
         axes[0].bar(
-            case_summary["case"],
+            x_cases - bar_width / 2,
             case_summary["maximum_heat_flux_W_cm2"],
             yerr=[
                 u_by_case.loc[c, "heat_flux_expanded_uncertainty_W_cm2_k2"]
                 for c in case_summary["case"]
             ],
+            width=bar_width,
             capsize=3,
             color=colors,
             edgecolor="black",
             linewidth=0.5,
+            label=r"$q^{\prime\prime}_{\max}$",
         )
-        axes[0].set_ylabel(r"$q^{\prime\prime}_{\max}$ (W cm$^{-2}$)")
-        axes[0].set_xlabel("Case")
+        axes[0].bar(
+            x_cases + bar_width / 2,
+            case_summary["q_DNB_plot_W_cm2"],
+            width=bar_width,
+            color=colors,
+            alpha=0.45,
+            edgecolor="black",
+            linewidth=0.5,
+            hatch="//",
+            label=r"$q^{\prime\prime}_{\mathrm{DNB}}$",
+        )
+        for _, row in case_summary[~case_summary["dnb_resolved_for_plot"]].iterrows():
+            index = int(case_summary.index[case_summary["case"] == row["case"]][0])
+            axes[0].text(index + bar_width / 2, 10, "n.r.", ha="center", va="bottom", fontsize=6.8, rotation=90)
+        axes[0].set_xticks(x_cases)
+        axes[0].set_xticklabels(case_summary["power_label"], rotation=18, ha="right")
+        axes[0].set_ylabel(r"$q^{\prime\prime}$ (W cm$^{-2}$)")
         axes[0].grid(True, axis="y", linestyle=":", alpha=0.45)
+        axes[0].legend(frameon=False, loc="best", handletextpad=0.3)
 
         hydro = hydro_summary.copy()
         hydro["dominant_slow_modulation_Hz"] = pd.to_numeric(
             hydro["dominant_slow_modulation_Hz"], errors="coerce"
         )
-        axes[1].text(0.02, 0.98, "(b)", transform=axes[1].transAxes, ha="left", va="top")
         for _, row in hydro.iterrows():
             axes[1].scatter(
                 row["nominal_power_W"],
@@ -703,12 +860,13 @@ def plot_final_ate_panels(
                 color=CASE_COLORS[row["case"]],
                 edgecolor="black",
                 linewidth=0.4,
-                label=row["case"],
+                label=power_label_from_case(row["case"]),
             )
         axes[1].set_xlabel(r"$P_{\mathrm{load}}$ (W)")
         axes[1].set_ylabel("Hydrophone modulation (Hz)")
         axes[1].grid(True, linestyle=":", alpha=0.45)
-        axes[1].legend(frameon=False, ncol=2, loc="best", handletextpad=0.3)
+        axes[1].legend(frameon=False, ncol=1, loc="best", handletextpad=0.3)
+        add_external_panel_labels(fig, axes)
         fig.savefig(panels_dir / "fig01_ate_case_heat_flux_and_hydrophone_modulation.png")
         fig.savefig(panels_dir / "fig01_ate_case_heat_flux_and_hydrophone_modulation.pdf")
         plt.close(fig)
@@ -753,13 +911,13 @@ def plot_final_ate_panels(
                     label=case,
                 )
             for i, ax in enumerate(axes):
-                ax.text(0.02, 0.98, f"({chr(97 + i)})", transform=ax.transAxes, ha="left", va="top")
                 ax.set_xticks(x)
                 ax.set_xticklabels(labels, rotation=12, ha="right")
                 ax.grid(True, axis="y", linestyle=":", alpha=0.45)
                 ax.legend(frameon=False, loc="best", handletextpad=0.3)
             axes[0].set_ylabel(r"$\tau$ (s)")
             axes[1].set_ylabel("Saturation fraction")
+            add_external_panel_labels(fig, axes)
             fig.savefig(panels_dir / "fig02_ate_envelope_metrics.png")
             fig.savefig(panels_dir / "fig02_ate_envelope_metrics.pdf")
             plt.close(fig)
@@ -804,7 +962,7 @@ def plot_final_ate_panels(
         "",
         "## Fig. 1. Case-level thermal and hydrophone response",
         "",
-        "Panel (a) reports the maximum reconstructed heat flux during active heating. Error bars show the expanded uncertainty (k = 2) from the pre-submission heat-flux uncertainty budget, including thermocouple propagation and a 2% standard uncertainty assigned to copper thermal conductivity. Panel (b) reports the dominant slow modulation frequency extracted from the band-integrated hydrophone power. Hydrophone PSD integration was performed in linear units over the stored hydrophone band before converting any values to dB.",
+        "Panel (a) compares the maximum reconstructed heat flux during active heating with the heat flux at the extracted DNB-associated event time. Error bars on `q''_max` show the expanded uncertainty (k = 2) from the pre-submission heat-flux uncertainty budget, including thermocouple propagation and a 2% standard uncertainty assigned to copper thermal conductivity. Unresolved DNB markers are labeled `n.r.` rather than plotted as misleading values. Panel (b) reports the dominant slow modulation frequency extracted from the band-integrated hydrophone power for all four power loads. Hydrophone PSD integration was performed in linear units over the stored hydrophone band before converting any values to dB.",
         "",
         "Files: `final_ate_panels/fig01_ate_case_heat_flux_and_hydrophone_modulation.png` and `.pdf`",
         "",
@@ -1100,8 +1258,10 @@ def write_summary_markdown(
 
 def write_analysis_history(output_dir: Path) -> None:
     plots = [
-        "plots/fig01a_boiling_curve_wall_temperature.png",
-        "plots/fig01b_boiling_curve_wall_superheat.png",
+        "plots/fig01a_heating_boiling_curve_wall_temperature.png",
+        "plots/fig01b_heating_boiling_curve_wall_superheat.png",
+        "plots/fig01c_full_history_boiling_curve_wall_temperature.png",
+        "plots/fig01d_full_history_boiling_curve_wall_superheat.png",
         "plots/fig02_thermal_hydrophone_four_case_summary.png",
         "plots/fig06_envelope_metric_summary.png",
         "plots/fig07a_literature_boiling_curve_comparison.png",
@@ -1163,6 +1323,7 @@ def write_analysis_history(output_dir: Path) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=".")
+    parser.add_argument("--raw-root", default=r"Y:\0_Ishraq\New Pool Boiling Video")
     parser.add_argument(
         "--literature-root",
         default=r"C:\Users\hanhu\Documents\New project 2\literature-compiler",
@@ -1179,20 +1340,21 @@ def main() -> None:
     set_style()
 
     repo_root = Path(args.repo_root).resolve()
+    raw_root = Path(args.raw_root).resolve()
     literature_root = Path(args.literature_root).resolve()
     output_dir = (repo_root / args.output_dir).resolve()
     plots_dir = output_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
     multi_summary, summaries = load_case_summaries(repo_root)
-    case_summary = write_publication_case_summary(output_dir, multi_summary)
+    case_summary = write_publication_case_summary(output_dir, multi_summary, summaries)
     availability = write_sensor_availability(output_dir, summaries, repo_root)
     hydro_summary, ae_summary = write_acoustic_summary(output_dir, summaries, repo_root)
     envelope = write_envelope_summary(output_dir, repo_root)
     uncertainty_diagnostics = write_uncertainty_diagnostics(output_dir, summaries, repo_root, multi_summary)
     uncertainty_budget = write_uncertainty_budget(output_dir, uncertainty_diagnostics, ae_summary, envelope)
 
-    plot_boiling_curves(repo_root, plots_dir)
+    plot_boiling_curves(repo_root, raw_root, plots_dir, summaries)
     plot_four_case_summary(case_summary, hydro_summary, plots_dir)
     plot_envelope_summary(envelope, plots_dir)
 
