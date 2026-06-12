@@ -39,7 +39,8 @@ FIGURES = {
         "heat flux and power load versus time. Panel (b) shows embedded "
         "thermocouple temperatures and extrapolated wall temperature. Dashed "
         "vertical markers identify $t_{\\mathrm{DNB}}$, $t_{\\mathrm{peak}}$, "
-        "$t_{\\mathrm{osc}}$, and $t_{\\mathrm{off}}$.",
+        "$t_{\\mathrm{osc}}$, and $t_{\\mathrm{off}}$; $t_{\\mathrm{DNB}}$ "
+        "is used as an operational transition-associated heat-flux maximum.",
     ),
     "3": (
         "fig03_case_c_thermal_time_histories.pdf",
@@ -51,7 +52,9 @@ FIGURES = {
         "Hydrophone diagnostics for the active-heating cases. The panels "
         "summarize spectrograms, band-integrated PSD power, and characteristic "
         "frequencies. The band-integrated power is computed by integrating the "
-        "linear voltage PSD over frequency before any logarithmic display.",
+        "linear voltage PSD over 0--6 kHz before any logarithmic display. "
+        "Slow MEB modulation frequencies are interpreted only for the developed "
+        "high-power cases.",
     ),
     "5": (
         "fig05_ae_waveform_diagnostics.pdf",
@@ -72,14 +75,16 @@ FIGURES = {
         "First-pass literature context for the present data. The compilation "
         "separates heat-transfer quantities from acoustic or oscillatory "
         "signature quantities because reported frequencies may describe "
-        "different physical scales.",
+        "different physical scales. Literature values are source-status labeled "
+        "and are not used to fit a cross-study correlation.",
     ),
     "8": (
         "fig08_representative_microbubble_frames.pdf",
         "Representative high-speed-video frames during developed MEB-like "
         "oscillations. Panels compare fewer-bubble and many-bubble states for "
         "the developed high-power cases. Frames are visually screened examples "
-        "and are annotated with the corresponding hydrophone-power percentile.",
+        "and are annotated with the corresponding hydrophone-power percentile "
+        "and frame-screening metric.",
     ),
     "9": (
         "fig09_storage_release_model.pdf",
@@ -87,7 +92,7 @@ FIGURES = {
         "is a conceptual driven, damped, nonlinear oscillator and is used to "
         "explain how constant input can produce growing heat-release bursts, "
         "acoustic-power modulation, and transient heat flux above the nominal "
-        "input scale.",
+        "input scale. It is not fitted to the present data.",
     ),
 }
 
@@ -526,7 +531,7 @@ def extract_between(md: str, start: str, end_pattern: str) -> str:
 
 
 def convert_body(md: str) -> str:
-    body = extract_between(md, "## 1. Introduction", r"^## 6\. Work Needed Before Submission")
+    body = extract_between(md, "## 1. Introduction", r"^## Data and Code Availability")
     body = "## 1. Introduction\n\n" + body
     lines = body.splitlines()
     out: list[str] = []
@@ -593,7 +598,7 @@ def build_main_tex(md: str) -> str:
     keywords = keywords_match.group(1).strip() if keywords_match else ""
     keyword_tex = r" \sep ".join(convert_inline(part.strip()) for part in keywords.split(";"))
     body = convert_body(md)
-    data_availability = extract_between(md, "## Data and Code Availability", r"^## Draft Figure Plan")
+    data_availability = extract_between(md, "## Data and Code Availability", r"^## References")
 
     return rf"""\documentclass[final,1p,times]{{elsarticle}}
 
