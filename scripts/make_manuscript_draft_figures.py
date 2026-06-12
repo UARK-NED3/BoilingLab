@@ -117,13 +117,20 @@ def add_event_lines(ax: plt.Axes, summary: dict[str, object]) -> None:
 def add_external_panel_label(fig: plt.Figure, ax: plt.Axes, label: str) -> None:
     bbox = ax.get_position()
     fig.text(
-        max(0.005, bbox.x0 - 0.052),
-        min(0.995, bbox.y1 + 0.01),
+        max(0.004, bbox.x0 - 0.052),
+        min(0.992, bbox.y1 + 0.006),
         label,
         ha="left",
         va="bottom",
         fontsize=10,
     )
+
+
+def add_external_panel_labels(fig: plt.Figure, axes) -> None:
+    fig.canvas.draw()
+    flat_axes = np.asarray(axes, dtype=object).ravel()
+    for i, ax in enumerate(flat_axes):
+        add_external_panel_label(fig, ax, f"({chr(97 + i)})")
 
 
 def save_png_pdf(fig: plt.Figure, path: Path) -> None:
@@ -143,11 +150,11 @@ def figure_1_boiling_curves(repo_root: Path, output_dir: Path) -> None:
         axes[1].plot(data["wall_superheat_C"], data["heat_flux_W_cm2"], color=CASE_COLORS[test_id], label=case)
     axes[0].set_xlabel(r"Wall temperature, $T_{\mathrm{w}}$ ($^\circ$C)")
     axes[1].set_xlabel(r"Wall superheat, $\Delta T_{\mathrm{w}}$ (K)")
-    for i, ax in enumerate(axes):
-        ax.text(0.02, 0.98, f"({chr(97 + i)})", transform=ax.transAxes, ha="left", va="top")
+    for ax in axes:
         ax.set_ylabel(r"Heat flux, $q^{\prime\prime}$ (W cm$^{-2}$)")
         ax.grid(True, linestyle=":", alpha=0.45)
     axes[1].legend(frameon=False, ncol=1, loc="best")
+    add_external_panel_labels(fig, axes)
     save_png_pdf(fig, output_dir / "fig01_heating_boiling_curves")
 
 
@@ -185,9 +192,8 @@ def figure_thermal_case(raw_root: Path, repo_root: Path, output_dir: Path, test_
     axes[1].grid(True, linestyle=":", alpha=0.45)
     axes[1].legend(frameon=False, loc="upper right", ncol=1)
     add_event_lines(axes[1], summary)
-    fig.canvas.draw()
+    add_external_panel_labels(fig, axes)
     for i, ax in enumerate(axes):
-        add_external_panel_label(fig, ax, f"({chr(97 + i)})")
         ax.set_xlim(0, float(np.nanmax(data["time_s"])))
     save_png_pdf(fig, output_dir / figure_name)
 
@@ -251,6 +257,7 @@ def figure_4_hydrophone(repo_root: Path, output_dir: Path) -> None:
         ax.set_xlim(0, 800)
         ax.grid(True, linestyle=":", alpha=0.45)
     axes[1, 1].legend(frameon=False, ncol=2, loc="best")
+    add_external_panel_labels(fig, axes)
     save_png_pdf(fig, output_dir / "fig04_hydrophone_diagnostics")
 
 
@@ -288,6 +295,7 @@ def figure_5_ae(repo_root: Path, output_dir: Path) -> None:
         ax.set_xlim(0, 800)
         ax.grid(True, linestyle=":", alpha=0.45)
     axes[1, 1].legend(frameon=False, loc="best")
+    add_external_panel_labels(fig, axes)
     save_png_pdf(fig, output_dir / "fig05_ae_waveform_diagnostics")
 
 
@@ -345,8 +353,7 @@ def figure_6_envelope(repo_root: Path, output_dir: Path) -> None:
     axes[1].set_ylabel(r"Envelope time constant, $\tau$ (s)")
     axes[1].grid(True, axis="y", linestyle=":", alpha=0.45)
     axes[1].legend(frameon=False, loc="best")
-    for i, ax in enumerate(axes):
-        ax.text(0.02, 0.98, f"({chr(97 + i)})", transform=ax.transAxes, ha="left", va="top")
+    add_external_panel_labels(fig, axes)
     save_png_pdf(fig, output_dir / "fig06_envelope_growth")
 
 
@@ -405,10 +412,10 @@ def figure_7_literature(repo_root: Path, output_dir: Path) -> None:
     axes[1].set_xscale("log")
     axes[1].set_xlabel("Reported frequency or modulation scale (Hz)")
     axes[1].set_ylabel(r"$q^{\prime\prime}$ (W cm$^{-2}$)")
-    for i, ax in enumerate(axes):
-        ax.text(0.02, 0.98, f"({chr(97 + i)})", transform=ax.transAxes, ha="left", va="top")
+    for ax in axes:
         ax.grid(True, linestyle=":", alpha=0.45)
         ax.legend(frameon=False, loc="best", fontsize=6.4)
+    add_external_panel_labels(fig, axes)
     save_png_pdf(fig, output_dir / "fig07_literature_context")
 
 
