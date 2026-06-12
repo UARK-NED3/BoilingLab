@@ -18,22 +18,36 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from run_multi_case_comparison import heating_mask_from_dc_power
 from run_single_case_demo import compute_temperature_quantities, parse_lvm_start_time_seconds, read_lvm
 
 
 CASE_IDS = ["Boiling-412", "Boiling-413", "Boiling-416", "Boiling-417"]
 CASE_LABELS = {
-    "Boiling-412": "Case A",
-    "Boiling-413": "Case B",
-    "Boiling-416": "Case C",
-    "Boiling-417": "Case D",
+    "Boiling-412": r"$P_{\mathrm{load}}$ = 150 W",
+    "Boiling-413": r"$P_{\mathrm{load}}$ = 180 W",
+    "Boiling-416": r"$P_{\mathrm{load}}$ = 230 W",
+    "Boiling-417": r"$P_{\mathrm{load}}$ = 250 W",
 }
 CASE_COLORS = {
-    "Case A": "#3B6688",
-    "Case B": "#756483",
-    "Case C": "#BF6B85",
-    "Case D": "#F2697A",
+    "Boiling-412": "#3B6688",
+    "Boiling-413": "#756483",
+    "Boiling-416": "#BF6B85",
+    "Boiling-417": "#F2697A",
+}
+CASE_BY_POWER_LABEL = {label: test_id for test_id, label in CASE_LABELS.items()}
+SOURCE_LABELS = {
+    "horiuchi_2019_transient_nucleate_to_meb": "Horiuchi et al. 2019",
+    "horiuchi_2021_spatiotemporal_meb": "Horiuchi et al. 2021",
+    "inada_2016_cavitation_bubble_blow_pit": "Inada et al. 2016",
+    "sinha_2021_deep_learning_sound_boiling": "Sinha et al. 2021",
+    "tang_2016_transition_to_meb": "Ando et al. 2016",
+    "zeigarnik_2012_microbubble_emission_nature": "Zeigarnik et al. 2012",
+    "zhu_2014_visualized_meb": "Zhu et al. 2014",
+    "ono_2023_acoustic_state_detection_meb": "Ono et al. 2023",
+    "kobayashi_2022_homogeneity_boiling_sound_meb": "Kobayashi et al. 2022",
+    "zhou_2018_sound_emission_subcooled_pool": "Zhou et al. 2018",
+    "kobayashi_2024_reduced_pressure_confined_meb": "Kobayashi et al. 2024",
+    "zhao_2025_open_microchannel_meb": "Zhao et al. 2025",
 }
 THERMOCOUPLE_LABELS = [r"$T_{\mathrm{TC1}}$", r"$T_{\mathrm{TC2}}$", r"$T_{\mathrm{TC3}}$", r"$T_{\mathrm{TC4}}$"]
 
@@ -87,7 +101,7 @@ def add_event_lines(ax: plt.Axes, summary: dict[str, object]) -> None:
     ymin = ax.get_ylim()[0]
     y = ymin + 0.08 * (ymax - ymin)
     for key, label, dx, ha in [
-        ("dnb_time_s", r"$t_{\mathrm{DNB}}$", 2.0, "left"),
+        ("dnb_time_s", r"$t_{\mathrm{DNB}}$", -2.0, "right"),
         ("peak_time_s", r"$t_{\mathrm{peak}}$", 2.0, "left"),
         ("oscillation_peak_time_s", r"$t_{\mathrm{osc}}$", 2.0, "left"),
         ("dc_shutoff_time_s", r"$t_{\mathrm{off}}$", -2.0, "right"),
@@ -98,6 +112,18 @@ def add_event_lines(ax: plt.Axes, summary: dict[str, object]) -> None:
         x = float(value)
         ax.axvline(x, color="0.25", linestyle="--", linewidth=0.8, alpha=0.8, label="_nolegend_")
         ax.text(x + dx, y, label, rotation=90, va="bottom", ha=ha, fontsize=8, color="0.2")
+
+
+def add_external_panel_label(fig: plt.Figure, ax: plt.Axes, label: str) -> None:
+    bbox = ax.get_position()
+    fig.text(
+        max(0.005, bbox.x0 - 0.052),
+        min(0.995, bbox.y1 + 0.01),
+        label,
+        ha="left",
+        va="bottom",
+        fontsize=10,
+    )
 
 
 def save_png_pdf(fig: plt.Figure, path: Path) -> None:
@@ -113,8 +139,8 @@ def figure_1_boiling_curves(repo_root: Path, output_dir: Path) -> None:
     for test_id in CASE_IDS:
         case = CASE_LABELS[test_id]
         data = curves[curves["test_id"] == test_id]
-        axes[0].plot(data["surface_temperature_C"], data["heat_flux_W_cm2"], color=CASE_COLORS[case], label=case)
-        axes[1].plot(data["wall_superheat_C"], data["heat_flux_W_cm2"], color=CASE_COLORS[case], label=case)
+        axes[0].plot(data["surface_temperature_C"], data["heat_flux_W_cm2"], color=CASE_COLORS[test_id], label=case)
+        axes[1].plot(data["wall_superheat_C"], data["heat_flux_W_cm2"], color=CASE_COLORS[test_id], label=case)
     axes[0].set_xlabel(r"Wall temperature, $T_{\mathrm{w}}$ ($^\circ$C)")
     axes[1].set_xlabel(r"Wall superheat, $\Delta T_{\mathrm{w}}$ (K)")
     for i, ax in enumerate(axes):
@@ -159,8 +185,9 @@ def figure_thermal_case(raw_root: Path, repo_root: Path, output_dir: Path, test_
     axes[1].grid(True, linestyle=":", alpha=0.45)
     axes[1].legend(frameon=False, loc="upper right", ncol=1)
     add_event_lines(axes[1], summary)
+    fig.canvas.draw()
     for i, ax in enumerate(axes):
-        ax.text(0.01, 0.96, f"({chr(97 + i)}) {CASE_LABELS[test_id]}", transform=ax.transAxes, ha="left", va="top")
+        add_external_panel_label(fig, ax, f"({chr(97 + i)})")
         ax.set_xlim(0, float(np.nanmax(data["time_s"])))
     save_png_pdf(fig, output_dir / figure_name)
 
@@ -190,19 +217,29 @@ def load_power_and_frequency(repo_root: Path, test_id: str, prefix: str) -> tupl
 
 def figure_4_hydrophone(repo_root: Path, output_dir: Path) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(7.25, 5.2), constrained_layout=True)
-    for ax, test_id, label in zip(axes[0], ["Boiling-416", "Boiling-417"], ["Case C", "Case D"]):
+    for ax, test_id in zip(axes[0], ["Boiling-416", "Boiling-417"]):
         image = mpimg.imread(repo_root / "demos" / test_id / "generated" / "plots" / "hydrophone_spectrogram.png")
         ax.imshow(image)
         ax.axis("off")
-        ax.text(0.01, 0.98, label, transform=ax.transAxes, ha="left", va="top", fontsize=9, color="black")
+        ax.text(
+            0.03,
+            0.93,
+            CASE_LABELS[test_id],
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=8,
+            color="black",
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.65, "pad": 1.5},
+        )
     for test_id in CASE_IDS:
         case = CASE_LABELS[test_id]
         power, freq = load_power_and_frequency(repo_root, test_id, "hydrophone")
-        axes[1, 0].plot(power["Time (s)"], power["power_db"], color=CASE_COLORS[case], linewidth=0.8, label=case)
+        axes[1, 0].plot(power["Time (s)"], power["power_db"], color=CASE_COLORS[test_id], linewidth=0.8, label=case)
         axes[1, 1].plot(
             freq["Time (s)"],
             freq["Spectral centroid (Hz)"] / 1000.0,
-            color=CASE_COLORS[case],
+            color=CASE_COLORS[test_id],
             linewidth=0.8,
             label=case,
         )
@@ -224,13 +261,22 @@ def figure_5_ae(repo_root: Path, output_dir: Path) -> None:
         image = mpimg.imread(repo_root / "demos" / test_id / "generated" / "plots" / "ae_wfs_spectrogram.png")
         axes[0, col].imshow(image)
         axes[0, col].axis("off")
-        axes[0, col].text(0.01, 0.98, case, transform=axes[0, col].transAxes, ha="left", va="top", fontsize=9)
+        axes[0, col].text(
+            0.03,
+            0.93,
+            case,
+            transform=axes[0, col].transAxes,
+            ha="left",
+            va="top",
+            fontsize=8,
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.65, "pad": 1.5},
+        )
         power, freq = load_power_and_frequency(repo_root, test_id, "ae")
-        axes[1, 0].plot(power["Time (s)"], power["power_db"], color=CASE_COLORS[case], linewidth=0.8, label=case)
+        axes[1, 0].plot(power["Time (s)"], power["power_db"], color=CASE_COLORS[test_id], linewidth=0.8, label=case)
         axes[1, 1].plot(
             freq["Time (s)"],
             freq["Spectral centroid (Hz)"] / 1000.0,
-            color=CASE_COLORS[case],
+            color=CASE_COLORS[test_id],
             linewidth=0.8,
             label=case,
         )
@@ -252,7 +298,7 @@ def figure_6_envelope(repo_root: Path, output_dir: Path) -> None:
         "heat_flux": r"$q^{\prime\prime}$",
         "hydrophone_power": "Hydrophone",
     }
-    line_styles = {"Case C": "-", "Case D": "--"}
+    line_styles = {CASE_LABELS["Boiling-416"]: "-", CASE_LABELS["Boiling-417"]: "--"}
     for test_id in ["Boiling-416", "Boiling-417"]:
         case = CASE_LABELS[test_id]
         data = pd.read_csv(repo_root / "demos" / test_id / "generated" / "meb_envelope_analysis.csv")
@@ -265,23 +311,29 @@ def figure_6_envelope(repo_root: Path, output_dir: Path) -> None:
                 frame["Normalized envelope"],
                 linestyle=line_styles[case],
                 linewidth=1.0,
-                label=f"{case} {label}",
+                label=f"{case}, {label}",
             )
     metrics = pd.read_csv(
         repo_root / "manuscripts" / "meb_multimodal_diagnostics" / "generated" / "publication_analysis" / "envelope_metrics_publication.csv"
     )
     keep = metrics[metrics["Signal key"].isin(signal_labels)].copy()
+    keep["case"] = keep["case"].replace(
+        {
+            "Case C": CASE_LABELS["Boiling-416"],
+            "Case D": CASE_LABELS["Boiling-417"],
+        }
+    )
     keep["plot_label"] = keep["Signal key"].map(signal_labels)
     xlabels = list(dict.fromkeys(keep["plot_label"]))
     x = np.arange(len(xlabels))
     width = 0.35
-    for offset, case in [(-width / 2, "Case C"), (width / 2, "Case D")]:
+    for offset, case in [(-width / 2, CASE_LABELS["Boiling-416"]), (width / 2, CASE_LABELS["Boiling-417"])]:
         data = keep[keep["case"] == case].set_index("plot_label")
         axes[1].bar(
             x + offset,
             [data.loc[label, "envelope_time_constant_s"] for label in xlabels],
             width=width,
-            color=CASE_COLORS[case],
+            color=CASE_COLORS[CASE_BY_POWER_LABEL[case]],
             label=case,
         )
     axes[0].set_xlabel(r"Time, $t$ (s)")
@@ -304,38 +356,59 @@ def figure_7_literature(repo_root: Path, output_dir: Path) -> None:
     present = pd.read_csv(base / "literature_boiling_curve_points_publication.csv")
     signatures = pd.read_csv(base / "literature_onset_signature_values_publication.csv")
     fig, axes = plt.subplots(1, 2, figsize=(7.25, 3.25), constrained_layout=True)
-    axes[0].scatter(lit["wall_superheat_K"], lit["heat_flux_W_cm2"], color="#4C78A8", s=24, label="Literature")
+    literature_colors = plt.get_cmap("tab10")
+    for index, (paper_id, data) in enumerate(lit.groupby("paper_id", sort=False)):
+        axes[0].scatter(
+            data["wall_superheat_K"],
+            data["heat_flux_W_cm2"],
+            color=literature_colors(index % 10),
+            s=24,
+            label=SOURCE_LABELS.get(paper_id, paper_id.replace("_", " ")),
+        )
     present_points = present[present["source_group"] == "Present work"]
-    axes[0].scatter(
-        present_points["wall_superheat_K"],
-        present_points["heat_flux_W_cm2"],
-        color="#F58518",
-        marker="s",
-        s=14,
-        alpha=0.8,
-        label="Present work",
-    )
+    for paper_id, data in present_points.groupby("paper_id", sort=False):
+        test_id = paper_id.replace("boilinglab_boiling_", "Boiling-")
+        axes[0].scatter(
+            data["wall_superheat_K"],
+            data["heat_flux_W_cm2"],
+            color=CASE_COLORS.get(test_id, "#F58518"),
+            marker="s",
+            s=14,
+            alpha=0.8,
+            label=CASE_LABELS.get(test_id, r"$P_{\mathrm{load}}$"),
+        )
     axes[0].set_xlabel(r"Wall superheat, $\Delta T_{\mathrm{w}}$ (K)")
     axes[0].set_ylabel(r"$q^{\prime\prime}$ (W cm$^{-2}$)")
 
     lit_sig = signatures[signatures["source_type"] != "user_experiment"].copy()
     present_sig = signatures[signatures["source_type"] == "user_experiment"].copy()
-    axes[1].scatter(lit_sig["frequency_Hz"], lit_sig["heat_flux_W_cm2"], color="#4C78A8", s=24, label="Literature")
-    axes[1].scatter(
-        present_sig["frequency_Hz"],
-        present_sig["heat_flux_W_cm2"],
-        color="#F58518",
-        marker="s",
-        s=32,
-        label="Present work",
-    )
+    lit_sig = lit_sig[np.isfinite(lit_sig["frequency_Hz"]) & np.isfinite(lit_sig["heat_flux_W_cm2"])]
+    for index, (source_id, data) in enumerate(lit_sig.groupby("source_id", sort=False)):
+        axes[1].scatter(
+            data["frequency_Hz"],
+            data["heat_flux_W_cm2"],
+            color=literature_colors(index % 10),
+            s=24,
+            label=SOURCE_LABELS.get(source_id, source_id.replace("_", " ")),
+        )
+    present_sig = present_sig[np.isfinite(present_sig["frequency_Hz"]) & np.isfinite(present_sig["heat_flux_W_cm2"])]
+    for source_id, data in present_sig.groupby("source_id", sort=False):
+        test_id = source_id.replace("boilinglab_boiling_", "Boiling-")
+        axes[1].scatter(
+            data["frequency_Hz"],
+            data["heat_flux_W_cm2"],
+            color=CASE_COLORS.get(test_id, "#F58518"),
+            marker="s",
+            s=32,
+            label=CASE_LABELS.get(test_id, r"$P_{\mathrm{load}}$"),
+        )
     axes[1].set_xscale("log")
     axes[1].set_xlabel("Reported frequency or modulation scale (Hz)")
     axes[1].set_ylabel(r"$q^{\prime\prime}$ (W cm$^{-2}$)")
     for i, ax in enumerate(axes):
         ax.text(0.02, 0.98, f"({chr(97 + i)})", transform=ax.transAxes, ha="left", va="top")
         ax.grid(True, linestyle=":", alpha=0.45)
-        ax.legend(frameon=False, loc="best")
+        ax.legend(frameon=False, loc="best", fontsize=6.4)
     save_png_pdf(fig, output_dir / "fig07_literature_context")
 
 
@@ -343,19 +416,19 @@ def write_caption_draft(output_dir: Path) -> None:
     captions = [
         "# Draft Manuscript Figure Captions",
         "",
-        "Fig. 1. Heating-only boiling curves for Cases A-D. Only samples with positive DC power are included.",
+        "Fig. 1. Heating-only boiling curves labeled by power load. Only samples with positive DC power are included.",
         "",
-        "Fig. 2. Case D thermal time histories with heat flux, power load, embedded thermocouple temperatures, extrapolated wall temperature, and event markers.",
+        "Fig. 2. 250 W thermal time histories with heat flux, power load, embedded thermocouple temperatures, extrapolated wall temperature, and event markers.",
         "",
-        "Fig. 3. Case C thermal time histories plotted with the same format as Fig. 2.",
+        "Fig. 3. 230 W thermal time histories plotted with the same format as Fig. 2.",
         "",
-        "Fig. 4. Hydrophone diagnostics. Top panels show current single-case spectrogram drafts for Cases C-D; bottom panels show band-integrated hydrophone power and centroid frequency for Cases A-D.",
+        "Fig. 4. Hydrophone diagnostics. Top panels show current single-case spectrogram drafts for 230 W and 250 W; bottom panels show band-integrated hydrophone power and centroid frequency for all power loads.",
         "",
-        "Fig. 5. AE waveform diagnostics for Cases C-D only. AE is limited to these cases because waveform files are unavailable for Cases A-B.",
+        "Fig. 5. AE waveform diagnostics for 230 W and 250 W only. AE is limited to these cases because waveform files are unavailable for 150 W and 180 W.",
         "",
-        "Fig. 6. Envelope analysis for the developed high-power cases, including normalized envelope histories and fitted time constants.",
+        "Fig. 6. Envelope analysis for the developed high-power tests, including normalized envelope histories and fitted time constants.",
         "",
-        "Fig. 7. Literature context from the first-pass `test2_meb` compilation. Literature rows marked as reported text or range endpoints require final figure/table verification before submission.",
+        "Fig. 7. Literature context from the first-pass `test2_meb` compilation, with source-specific brief citation labels. Literature rows marked as reported text or range endpoints require final figure/table verification before submission.",
         "",
     ]
     (output_dir / "captions.md").write_text("\n".join(captions), encoding="utf-8")
