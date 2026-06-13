@@ -10,3 +10,4 @@ nbformat
 nbclient
 imageio-ffmpeg
 decode-wfs
+CoolProp

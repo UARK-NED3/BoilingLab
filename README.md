@@ -12,6 +12,11 @@ codes, and multimodal data synchronization and analysis codes.
   The `Test ID` column is the primary key for each unique test.
 - `demos/Boiling-417`: example single-case run using raw data from
   `Y:\0_Ishraq\New Pool Boiling Video\Boiling-417`.
+- `scripts/run_boiling_hysteresis_analysis.py`: manuscript-level analysis for
+  the subatmospheric boiling hysteresis study using the organized 30-case
+  spreadsheet.
+- `manuscripts/boiling_hysteresis_subatmospheric`: documentation and generated
+  outputs for the boiling hysteresis manuscript analysis.
 
 ## Data Organization
 
@@ -141,6 +146,36 @@ python scripts\run_multi_case_comparison.py --test-ids Boiling-145 Boiling-146 B
 ```
 
 Use `--power-threshold-w` if a different positive-power cutoff is needed.
+
+## Reproduce the Boiling Hysteresis Manuscript Analysis
+
+The boiling hysteresis study uses an organized 30-case spreadsheet rather than
+raw LVM files. With the Box drive mounted, run:
+
+```powershell
+python scripts\run_boiling_hysteresis_analysis.py
+```
+
+By default the runner reads:
+
+```text
+C:\Users\hanhu\Box\NED3_Share\Zulkar Nain Prince\MS Thesis Data_30cases.xlsx
+```
+
+and writes processed tables, fit summaries, and publication-style figures to:
+
+```text
+manuscripts\boiling_hysteresis_subatmospheric\generated
+```
+
+The analysis defines boiling hysteresis as
+`H = q''_NBR / q''_CHF`, fits stretched-exponential thermal-maturity models
+against `T_max - T_sat`, analyzes the NBR wall-superheat band
+`T_NBR - T_sat`, compares `q''_NBR(T_NBR)` against the Rohsenow correlation,
+and summarizes BubbleID side-view vapor-fraction diagnostics when those columns
+are present in the spreadsheet. See
+`manuscripts\boiling_hysteresis_subatmospheric\README.md` for equations,
+figure descriptions, and interpretation notes.
 
 ## Notes for Contributors
 
