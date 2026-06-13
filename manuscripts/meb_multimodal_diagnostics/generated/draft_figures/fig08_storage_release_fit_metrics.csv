@@ -1,0 +1,5 @@
+test_id,case,signal_key,frequency_Hz,r2
+Boiling-416,$P_{\mathrm{load}}$ = 230 W,wall_temperature,0.05361924686192469,0.432727615888322
+Boiling-416,$P_{\mathrm{load}}$ = 230 W,heat_flux,0.05361924686192469,0.4226803160788549
+Boiling-417,$P_{\mathrm{load}}$ = 250 W,wall_temperature,0.07508368200836821,0.34294532288917123
+Boiling-417,$P_{\mathrm{load}}$ = 250 W,heat_flux,0.07548117154811715,0.31746759382620227

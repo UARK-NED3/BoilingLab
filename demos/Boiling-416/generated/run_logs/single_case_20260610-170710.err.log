@@ -1,0 +1,2 @@
+C:\Users\hanhu\Documents\New project 2\BoilingLab\scripts\run_single_case_demo.py:1164: UserWarning: Applied AEwin64 stream start offset: 3,072 samples
+  raw, time_s, sampling_rate = load_continuous(wfs_path, channel=channel)

@@ -16,3 +16,12 @@ New Pool Boiling Video/
 # OS/editor noise
 .DS_Store
 Thumbs.db
+
+# LaTeX build outputs from local Overleaf package checks
+manuscripts/meb_multimodal_diagnostics/overleaf/main*.aux
+manuscripts/meb_multimodal_diagnostics/overleaf/main*.bbl
+manuscripts/meb_multimodal_diagnostics/overleaf/main*.blg
+manuscripts/meb_multimodal_diagnostics/overleaf/main*.log
+manuscripts/meb_multimodal_diagnostics/overleaf/main*.out
+manuscripts/meb_multimodal_diagnostics/overleaf/main*.pdf
+manuscripts/meb_multimodal_diagnostics/overleaf/main*.spl

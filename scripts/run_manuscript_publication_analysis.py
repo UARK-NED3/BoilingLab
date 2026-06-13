@@ -687,14 +687,21 @@ def plot_envelope_summary(envelope: pd.DataFrame, plots_dir: Path) -> None:
     plt.close(fig)
 
 
-def load_literature_tables(literature_root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_literature_tables(literature_root: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     data_dir = literature_root / "examples" / "test2_meb" / "data"
-    return pd.read_csv(data_dir / "combined_points.csv"), pd.read_csv(data_dir / "meb_regime_signatures.csv")
+    digitized_curves_path = data_dir / "literature_digitized_curves.csv"
+    digitized_curves = pd.read_csv(digitized_curves_path) if digitized_curves_path.exists() else pd.DataFrame()
+    return (
+        pd.read_csv(data_dir / "combined_points.csv"),
+        pd.read_csv(data_dir / "meb_regime_signatures.csv"),
+        digitized_curves,
+    )
 
 
 def plot_literature_comparison(
     combined: pd.DataFrame,
     signatures: pd.DataFrame,
+    digitized_curves: pd.DataFrame,
     plots_dir: Path,
     output_dir: Path,
 ) -> None:
@@ -706,7 +713,24 @@ def plot_literature_comparison(
     )
     points["wall_superheat_K"] = points["x_value"]
     points["source_group"] = np.where(points["source_type"] == "user_experiment", "Present work", "Literature")
-    points[["paper_id", "curve_id", "wall_superheat_K", "heat_flux_W_cm2", "source_group", "notes"]].to_csv(
+    export_points = points[["paper_id", "curve_id", "wall_superheat_K", "heat_flux_W_cm2", "source_group", "notes"]]
+    if not digitized_curves.empty:
+        curve_export = digitized_curves.copy()
+        curve_export["source_group"] = "Literature"
+        curve_export["notes"] = (
+            "figure_digitized_curve; "
+            + curve_export.get("system_group", "").astype(str)
+            + "; "
+            + curve_export.get("notes", "").astype(str)
+        )
+        export_points = pd.concat(
+            [
+                export_points,
+                curve_export[["paper_id", "curve_id", "wall_superheat_K", "heat_flux_W_cm2", "source_group", "notes"]],
+            ],
+            ignore_index=True,
+        )
+    export_points.to_csv(
         output_dir / "literature_boiling_curve_points_publication.csv",
         index=False,
     )
@@ -716,7 +740,7 @@ def plot_literature_comparison(
         ("Literature", "o", "#4C78A8", 0.65),
         ("Present work", "s", "#F58518", 0.9),
     ]:
-        data = points[points["source_group"] == group]
+        data = export_points[export_points["source_group"] == group]
         ax.scatter(
             data["wall_superheat_K"],
             data["heat_flux_W_cm2"],
@@ -1082,6 +1106,7 @@ def write_literature_digitized_tables(
     output_dir: Path,
     combined: pd.DataFrame,
     signatures: pd.DataFrame,
+    digitized_curves: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Write normalized literature tables used by final manuscript figures.
 
@@ -1119,6 +1144,25 @@ def write_literature_digitized_tables(
         "notes",
     ]
     lit_points = lit_points[point_cols].sort_values(["paper_id", "curve_id"]).reset_index(drop=True)
+    if not digitized_curves.empty:
+        curve_points = digitized_curves.copy()
+        curve_points["figure_id"] = curve_points["figure_id"].astype(str).str.strip()
+        curve_points["digitization_status"] = "figure_digitized_or_curve_point"
+        curve_points["recommended_use"] = np.where(
+            curve_points["system_group"].str.contains("microchannel", case=False, na=False),
+            "Use as geometry-separated context only",
+            "Use as approximate source-digitized boiling curve after final WebPlotDigitizer verification",
+        )
+        curve_points["notes"] = (
+            curve_points.get("system_group", "").astype(str)
+            + "; "
+            + curve_points.get("geometry", "").astype(str)
+            + "; "
+            + curve_points.get("notes", "").astype(str)
+        )
+        curve_points = curve_points[point_cols]
+        lit_points = pd.concat([lit_points, curve_points], ignore_index=True)
+        lit_points = lit_points.sort_values(["paper_id", "curve_id", "wall_superheat_K"]).reset_index(drop=True)
     lit_points.to_csv(output_dir / "literature_digitized_boiling_points_publication.csv", index=False)
 
     onset = signatures.copy()
@@ -1377,13 +1421,14 @@ def main() -> None:
     plot_four_case_summary(case_summary, hydro_summary, plots_dir)
     plot_envelope_summary(envelope, plots_dir)
 
-    combined, signatures = load_literature_tables(literature_root)
-    plot_literature_comparison(combined, signatures, plots_dir, output_dir)
+    combined, signatures, digitized_curves = load_literature_tables(literature_root)
+    plot_literature_comparison(combined, signatures, digitized_curves, plots_dir, output_dir)
     digitization_priority = write_literature_digitization_priority(output_dir)
     literature_points, literature_onsets = write_literature_digitized_tables(
         output_dir,
         combined,
         signatures,
+        digitized_curves,
     )
     plot_final_ate_panels(
         output_dir,

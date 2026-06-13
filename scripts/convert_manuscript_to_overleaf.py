@@ -29,9 +29,12 @@ ELSARTICLE_FILES = [
 FIGURES = {
     "1": (
         "fig01_heating_boiling_curves.pdf",
-        "Heating-only boiling curves for the four active-heating cases. "
-        "Panel (a) shows $q''$ versus $T_w$, and panel (b) shows $q''$ "
-        "versus wall superheat. Only positive-power heating data are included.",
+        "Boiling curves for the four cases. Panel (a) shows heating-only "
+        "$q''$ versus wall superheat using samples with positive DC power. "
+        "Panel (b) shows the full thermal history; solid lines are heating "
+        "before power shutoff and dashed lines are cooling after shutoff. "
+        "The corner marker gives the maximum expanded uncertainty ($k=2$) "
+        "for $T_w$ and $q''$ among the four cases.",
     ),
     "2": (
         "fig02_case_d_thermal_time_histories.pdf",
@@ -64,35 +67,39 @@ FIGURES = {
         "logic as the hydrophone analysis.",
     ),
     "6": (
-        "fig06_envelope_growth.pdf",
-        "Oscillation-envelope growth and saturation for the developed high-power "
-        "cases. Smoothed Hilbert envelopes are compared with first-order "
-        "asymptotic fits, and normalized envelopes show the different thermal "
-        "and acoustic growth behavior.",
+        "fig06_envelope_showcase.pdf",
+        "Raw detrended oscillations and envelope extraction for the developed "
+        "high-power cases. Gray traces are detrended thermal signals; colored "
+        "curves show the Hilbert envelope and the fitted asymptotic envelope. "
+        "The negative fitted envelope is shown as a dotted guide to visualize "
+        "the oscillation amplitude.",
     ),
     "7": (
-        "fig07_literature_context.pdf",
-        "First-pass literature context for the present data. The compilation "
-        "separates heat-transfer quantities from acoustic or oscillatory "
-        "signature quantities because reported frequencies may describe "
-        "different physical scales. Literature values are source-status labeled "
-        "and are not used to fit a cross-study correlation.",
+        "fig07_envelope_growth.pdf",
+        "Oscillation-envelope growth and saturation metrics for the developed "
+        "high-power cases. Normalized envelopes show the different thermal "
+        "and acoustic growth behavior, while the bar chart compares fitted "
+        "time constants.",
     ),
     "8": (
-        "fig08_representative_microbubble_frames.pdf",
-        "Representative high-speed-video frames during developed MEB-like "
-        "oscillations. Panels compare fewer-bubble and many-bubble states for "
-        "the developed high-power cases. Frames are visually screened examples "
-        "and are annotated with the corresponding hydrophone-power percentile "
-        "and frame-screening metric.",
+        "fig08_storage_release_fit.pdf",
+        "Data-constrained oscillatory surrogate for the developed MEB-like "
+        "regime. The fitted surrogate uses the asymptotic envelope from "
+        "Fig.~\\ref{fig:6} multiplied by a sinusoidal release coordinate and "
+        "is compared with detrended wall-temperature and heat-flux oscillations. "
+        "The fit is phenomenological and is used to test whether the proposed "
+        "storage-release picture can reproduce the observed slow oscillation "
+        "scale.",
     ),
     "9": (
-        "fig09_storage_release_model.pdf",
-        "Reduced-order storage-release oscillator for the MEB regime. The model "
-        "is a conceptual driven, damped, nonlinear oscillator and is used to "
-        "explain how constant input can produce growing heat-release bursts, "
-        "acoustic-power modulation, and transient heat flux above the nominal "
-        "input scale. It is not fitted to the present data.",
+        "fig09_literature_context.pdf",
+        "Source-status-labeled literature context for the present data. "
+        "The heat-transfer panel includes reported values, range endpoints, "
+        "approximate figure-digitized boiling-curve traces from selected "
+        "published MEB studies, and present reduced data. Dotted traces denote "
+        "geometry-separated context. The signature panel separates heat-transfer "
+        "quantities from acoustic or oscillatory quantities because reported "
+        "frequencies may describe different physical scales.",
     ),
 }
 
@@ -101,20 +108,6 @@ FIGURE_SOURCES = {
     name: MANUSCRIPT_DIR / "generated" / "draft_figures" / name
     for name, _caption in FIGURES.values()
 }
-FIGURE_SOURCES.update(
-    {
-        "fig08_representative_microbubble_frames.pdf": MANUSCRIPT_DIR
-        / "generated"
-        / "publication_analysis"
-        / "mechanism"
-        / "fig08_representative_microbubble_frames.pdf",
-        "fig09_storage_release_model.pdf": MANUSCRIPT_DIR
-        / "generated"
-        / "publication_analysis"
-        / "mechanism"
-        / "fig09_storage_release_model.pdf",
-    }
-)
 
 
 BIBTEX = r"""
@@ -388,6 +381,11 @@ MATH_MAP = {
     "t_peak": "$t_{\\mathrm{peak}}$",
     "tau": "$\\tau$",
     "Theta": "$\\Theta$",
+    "xi": "$\\xi$",
+    "H": "$H$",
+    "Phi": "$\\Phi$",
+    "K_eff": "$K_{\\mathrm{eff}}$",
+    "R_eff": "$R_{\\mathrm{eff}}$",
 }
 
 
@@ -452,7 +450,7 @@ def strip_heading_number(heading: str) -> str:
 def figure_environment(fig_no: str) -> str:
     filename, caption = FIGURES[fig_no]
     return (
-        "\\begin{figure}[t]\n"
+        "\\begin{figure}[H]\n"
         "  \\centering\n"
         f"  \\includegraphics[width=\\linewidth]{{{filename}}}\n"
         f"  \\caption{{{caption}}}\n"
@@ -489,6 +487,35 @@ def convert_table(caption: str | None, table_lines: list[str]) -> str:
     return "\n".join(out)
 
 
+def convert_nomenclature(md: str) -> str:
+    try:
+        section = extract_between(md, "## Nomenclature", r"^## 1\. Introduction")
+    except ValueError:
+        return ""
+    table_lines = [line for line in section.splitlines() if line.startswith("|")]
+    rows = []
+    for line in table_lines:
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if all(set(cell) <= {"-", ":"} for cell in cells):
+            continue
+        rows.append(cells)
+    if not rows:
+        return ""
+    out = [
+        "\\section*{Nomenclature}",
+        "\\begin{center}",
+        "\\small",
+        "\\begin{tabular}{@{}p{0.16\\textwidth}p{0.56\\textwidth}p{0.16\\textwidth}@{}}",
+        "\\toprule",
+        "    " + " & ".join(convert_inline(cell) for cell in rows[0]) + r" \\",
+        "\\midrule",
+    ]
+    for row in rows[1:]:
+        out.append("    " + " & ".join(convert_inline(cell) for cell in row) + r" \\")
+    out.extend(["\\bottomrule", "\\end{tabular}", "\\end{center}", "\\normalsize"])
+    return "\n".join(out)
+
+
 def convert_equation_block(lines: list[str]) -> str:
     joined = "\n".join(line.strip() for line in lines)
     if "A(t)" in joined:
@@ -509,7 +536,8 @@ def convert_equation_block(lines: list[str]) -> str:
         )
     if "C_eff" in joined:
         return (
-            "\\begin{align}\n"
+            "\\begin{equation}\n"
+            "\\begin{aligned}\n"
             "C_{\\mathrm{eff}}\\frac{\\mathrm{d}\\Theta}{\\mathrm{d}t} &= "
             "q''_{\\mathrm{in}} - q''_{\\mathrm{release}}(\\Theta,\\xi) - q''_{\\mathrm{loss}}, \\\\\n"
             "L_{\\mathrm{eff}}\\frac{\\mathrm{d}^2\\xi}{\\mathrm{d}t^2} + "
@@ -517,8 +545,9 @@ def convert_equation_block(lines: list[str]) -> str:
             "K_{\\mathrm{eff}}\\xi &= F(\\Theta,\\xi), \\\\\n"
             "q''_{\\mathrm{release}} &= H(\\Theta-\\Theta_c)\\Phi\\left(\\xi,"
             "\\frac{\\mathrm{d}\\xi}{\\mathrm{d}t}\\right) .\n"
+            "\\end{aligned}\n"
             "\\label{eq:storage-release}\n"
-            "\\end{align}"
+            "\\end{equation}"
         )
     return "\\begin{verbatim}\n" + "\n".join(lines) + "\n\\end{verbatim}"
 
@@ -593,10 +622,15 @@ def convert_body(md: str) -> str:
 
 
 def build_main_tex(md: str) -> str:
+    title_match = re.search(r"^#\s+(.+)", md, flags=re.MULTILINE)
+    title = convert_inline(title_match.group(1).strip()) if title_match else (
+        "Coupled Thermal and Acoustic Characterization of Energy Storage-Release Dynamics in Microbubble Emission Boiling"
+    )
     abstract = extract_between(md, "## Abstract", r"^\*\*Keywords:")
     keywords_match = re.search(r"\*\*Keywords:\*\*\s*(.+)", md)
     keywords = keywords_match.group(1).strip() if keywords_match else ""
     keyword_tex = r" \sep ".join(convert_inline(part.strip()) for part in keywords.split(";"))
+    nomenclature = convert_nomenclature(md)
     body = convert_body(md)
     data_availability = extract_between(md, "## Data and Code Availability", r"^## References")
 
@@ -606,6 +640,7 @@ def build_main_tex(md: str) -> str:
 \usepackage{{booktabs}}
 \usepackage{{siunitx}}
 \usepackage{{adjustbox}}
+\usepackage{{float}}
 \usepackage{{hyperref}}
 
 \journal{{Applied Thermal Engineering}}
@@ -615,10 +650,12 @@ def build_main_tex(md: str) -> str:
 
 \begin{{frontmatter}}
 
-\title{{Time-Resolved Thermal and Acoustic Diagnostics of Microbubble Emission Boiling Under Subcooled Pool Boiling Conditions}}
+\title{{{title}}}
 
-\author[inst1]{{Author list to be finalized}}
-\affiliation[inst1]{{organization={{University of Arkansas}}, city={{Fayetteville}}, state={{AR}}, country={{USA}}}}
+\author[inst1]{{Mohamamd Ishraq Hossain}}
+\author[inst1]{{Stephen Pierson}}
+\author[inst1]{{Han Hu}}
+\affiliation[inst1]{{organization={{Department of Mechanical Engineering, University of Arkansas}}, city={{Fayetteville}}, state={{AR}}, postcode={{72701}}, country={{USA}}}}
 % \cortext[cor1]{{Corresponding author.}}
 % \ead{{corresponding.author@example.edu}}
 
@@ -633,6 +670,8 @@ def build_main_tex(md: str) -> str:
 \input{{highlights}}
 
 \end{{frontmatter}}
+
+{nomenclature}
 
 {body}
 
