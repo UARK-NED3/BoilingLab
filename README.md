@@ -10,6 +10,13 @@ codes, and multimodal data synchronization and analysis codes.
   subcooled pool boiling experiments.
 - `metadata/Pool Boiling Test Log.xlsx`: experiment log and metadata table.
   The `Test ID` column is the primary key for each unique test.
+- `docs/experimental_protocol.md`: subatmospheric pool-boiling facility,
+  heater enclosure, environmental-control, surface-preparation, degassing,
+  heat-load-selection, and test-sequence documentation consolidated from the
+  MSME thesis materials.
+- `docs/data_reduction.md`: thermal reconstruction, heat-flux calculation,
+  pressure/saturation assumptions, event definitions, heating-branch filtering,
+  hysteresis metrics, BubbleID vapor-state metrics, and reproducibility checks.
 - `demos/Boiling-417`: example single-case run using raw data from
   `Y:\0_Ishraq\New Pool Boiling Video\Boiling-417`.
 - `scripts/run_boiling_hysteresis_analysis.py`: manuscript-level analysis for
@@ -43,6 +50,27 @@ Use `Test ID` to connect:
 The Excel log also includes experiment descriptors such as pressure, personnel,
 date, surface, liquid, frame rate, resolution, chamber configuration, camera,
 and acquisition notes.
+
+## Experimental Protocol Documentation
+
+The `docs` folder records the experimental-method context needed to interpret
+the raw files and generated analysis outputs:
+
+- [Experimental protocol](docs/experimental_protocol.md) describes the
+  pressure-controlled boiling chamber, heating element enclosure, copper
+  surface preparation, DI-water degassing, saturation and pressure control,
+  transient heat-load selection, and the ONB -> NB -> CHF -> TB -> NBR -> NB
+  test sequence.
+- [Data reduction](docs/data_reduction.md) documents the four-thermocouple
+  linear conduction model, wall-temperature extrapolation, Fourier-law heat
+  flux calculation, wall superheat, HTC, heating-branch filtering, CHF/NBR
+  marker conventions, boiling hysteresis ratio, thermal-maturity model, and
+  BubbleID side-view vapor-fraction metrics.
+
+These files were added to make the analysis scripts traceable to the
+experimental methodology in Ishraq Hossain's MSME thesis draft and defense
+presentation. They intentionally avoid storing raw videos, large acquisition
+outputs, or private local source paths in git.
 
 ## Environment Setup
 
@@ -184,3 +212,6 @@ figure descriptions, and interpretation notes.
   understand the analysis workflow.
 - When adding a new test analysis, make sure its `Test ID` matches both the raw
   data folder name and the row in the test log.
+- When changing copper-block geometry, thermocouple locations, surface
+  definitions, event-picking logic, or hysteresis metrics, update the docs and
+  generated summaries together so the repo remains methodologically traceable.
