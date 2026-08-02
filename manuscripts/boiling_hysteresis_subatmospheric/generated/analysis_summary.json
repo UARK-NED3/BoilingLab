@@ -30,5 +30,8 @@
       "r2": 0.935177484712356,
       "rmse": 0.03346991959410343
     }
-  ]
+  ],
+  "protocol_validation_file": "C:\\Users\\hanhu\\Downloads\\MS Thesis Data.xlsx",
+  "protocol_validation_sha256": "3a825abfbc86d14c4ae3da44dc35091f74cc420f5f7dc943ff4a29327e7a2193",
+  "n_protocol_validation_cases": 5
 }

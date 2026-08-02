@@ -8,6 +8,10 @@ The input is the organized 30-case spreadsheet (`MS Thesis Data_30cases.xlsx`).
 The runner reads thermal summary quantities, NBR temperature, and optional
 BubbleID side-view vapor-fraction / bubble-count columns.
 
+An optional five-case flat-copper protocol spreadsheet can be supplied with
+`--protocol-data`. Those approximately 10 kPa cases are written separately and
+are not included in the 30-case parameter fits.
+
 ## Core Models
 
 The manuscript-level hysteresis coordinate is
@@ -32,7 +36,8 @@ For submission diagnostics, run
 `scripts/run_boiling_hysteresis_submission_diagnostics.py`. That script fixes
 `H_min = 0` as a parsimonious boundary condition, compares candidate models by
 AICc and held-out validation, tests residual structure, profiles `H_min`, and
-generates 2,000-resample bootstrap intervals. The preferred model uses
+generates 2,000 pressure-block bootstrap intervals. It also evaluates the
+locked fits against the optional protocol cases. The preferred model uses
 `(T_max - T_sat)/(T_ref - T_sat)`; it should be treated as a semi-empirical
 interpolation, not as a universal stability law.
 
@@ -48,11 +53,14 @@ The diagnostic
   superheat.
 - `fig04_nbr_wall_superheat_vs_pressure`: NBR wall-superheat band, supporting
   temperature-controlled rewetting.
-- `fig05_qnbr_rohsenow_parity`: comparison of q''_NBR(T_NBR) against the
-  Rohsenow nucleate-boiling correlation using `C_sf = 0.0128`.
+- `fig05_qnbr_rohsenow_parity`: sensitivity of q''_NBR(T_NBR) to the
+  Rohsenow liquid-surface coefficient (`C_sf = 0.0128` and `0.0107`).
 - `fig06_bubbleid_vapor_fraction_by_stage`: two-panel BubbleID diagnostic
   showing (a) side-view vapor fraction at ONB, CHF, and NBR and (b) vapor
   persistence, `VF_NBR/VF_CHF`, versus the boiling hysteresis ratio.
+- `fig07_flat_mfb_regime_check`: flat-copper regime check against Berenson and
+  Henry minimum-film-boiling temperatures; structured surfaces are omitted
+  because no validated geometry-specific MFB model is available.
 
 ## Notes
 

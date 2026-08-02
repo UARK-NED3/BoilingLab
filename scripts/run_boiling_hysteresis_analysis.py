@@ -5,7 +5,9 @@ This runner reproduces the analysis used for the boiling-hysteresis manuscript:
 * pressure and surface trends in CHF/HTC and hysteresis,
 * stretched-exponential thermal-maturity fits,
 * NBR wall-superheat diagnostics,
-* Rohsenow comparison for q''_NBR(T_NBR), and
+* Rohsenow sensitivity for q''_NBR(T_NBR),
+* flat-surface minimum-film-boiling regime checks,
+* held-out 10 kPa post-CHF protocol tests, and
 * BubbleID side-view vapor-fraction summaries.
 
 The script intentionally reads the organized spreadsheet rather than raw LVM
@@ -120,6 +122,12 @@ def load_hysteresis_dataset(path: Path, sheet_name: str) -> pd.DataFrame:
     }
     optional = {}
     for out_name, candidates in {
+        "heater_power_W": ["MagnaDC Power (W)"],
+        "t_chf_s": ["Time (sec) at CHF"],
+        "t_nbr_s": ["Time (sec) at NBR"],
+        "q_min_W_cm2": ["q_min (between NBR and CHF)"],
+        "rusting_days": ["Rusting (Days)"],
+        "protocol_note": ["Unnamed: 38"],
         "onb_vf": ["ONB_vf"],
         "chf_vf": ["CHF_vf"],
         "nbr_vf": ["NBR_vf"],
@@ -146,7 +154,12 @@ def load_hysteresis_dataset(path: Path, sheet_name: str) -> pd.DataFrame:
         }
     )
     for out_name, col in optional.items():
-        data[out_name] = pd.to_numeric(raw[col], errors="coerce")
+        if out_name == "protocol_note":
+            data[out_name] = raw[col].astype("string")
+        elif out_name == "rusting_days":
+            data[out_name] = raw[col].astype("string")
+        else:
+            data[out_name] = pd.to_numeric(raw[col], errors="coerce")
 
     data = data.dropna(
         subset=["pressure_kpa", "surface", "q_chf_W_cm2", "q_nbr_W_cm2", "T_max_C", "T_sat_C"]
@@ -159,8 +172,39 @@ def load_hysteresis_dataset(path: Path, sheet_name: str) -> pd.DataFrame:
         data["delta_vf_chf_to_nbr"] = data["nbr_vf"] - data["chf_vf"]
     if {"chf_count", "nbr_count"}.issubset(data.columns):
         data["delta_count_chf_to_nbr"] = data["nbr_count"] - data["chf_count"]
+    if {"t_chf_s", "t_nbr_s"}.issubset(data.columns):
+        data["post_chf_to_nbr_s"] = data["t_nbr_s"] - data["t_chf_s"]
     data = data.sort_values(["surface", "pressure_kpa"]).reset_index(drop=True)
     return data
+
+
+def load_protocol_validation(path: Path, sheet_name: str) -> pd.DataFrame:
+    """Load the five 10 kPa flat-Cu tests with deliberately extended heating.
+
+    These cases are not included in the 30-case fit. They perturb the post-CHF
+    thermal history at approximately fixed pressure, surface, and heater power.
+    """
+    data = load_hysteresis_dataset(path, sheet_name)
+    data = data[data["test_id"].str.extract(r"(\d+)$", expand=False).isin(["420", "421", "422", "423", "424"])].copy()
+    if len(data) != 5:
+        raise ValueError(f"Expected protocol cases Boiling-420--424; found {len(data)} rows in {path}")
+    targets = {
+        "Boiling-420": np.nan,
+        "Boiling-421": 100.0,
+        "Boiling-422": 150.0,
+        "Boiling-423": 200.0,
+        "Boiling-424": 250.0,
+    }
+    labels = {
+        "Boiling-420": "baseline",
+        "Boiling-421": "100 °C target",
+        "Boiling-422": "150 °C target",
+        "Boiling-423": "200 °C target",
+        "Boiling-424": "250 °C target",
+    }
+    data["target_Tmax_C"] = data["test_id"].map(targets)
+    data["protocol_label"] = data["test_id"].map(labels)
+    return data.sort_values("T_max_C").reset_index(drop=True)
 
 
 def hysteresis_constant_scale(delta_t: np.ndarray, h_min: float, delta_t_s: float, m: float) -> np.ndarray:
@@ -231,6 +275,8 @@ def water_saturation_props(pressure_kpa: float) -> dict[str, float]:
     mu_l = PropsSI("V", "P", p, "Q", 0, "Water")
     cp_l = PropsSI("C", "P", p, "Q", 0, "Water")
     k_l = PropsSI("L", "P", p, "Q", 0, "Water")
+    mu_v = PropsSI("V", "P", p, "Q", 1, "Water")
+    k_v = PropsSI("L", "P", p, "Q", 1, "Water")
     return {
         "pressure_kpa": pressure_kpa,
         "tsat_c": tsat_k - 273.15,
@@ -241,6 +287,8 @@ def water_saturation_props(pressure_kpa: float) -> dict[str, float]:
         "mu_l": mu_l,
         "cp_l": cp_l,
         "k_l": k_l,
+        "mu_v": mu_v,
+        "k_v": k_v,
     }
 
 
@@ -280,6 +328,52 @@ def rohsenow_q_w_m2(props: dict[str, float], delta_t_k: np.ndarray, c_sf: float 
     )
 
 
+def berenson_mfb_temperature_c(props: dict[str, float]) -> tuple[float, float]:
+    """Berenson hydrodynamic minimum-film-boiling temperature."""
+    rho_delta = props["rho_l"] - props["rho_v"]
+    delta_t_b = (
+        0.127
+        * props["rho_v"]
+        * props["h_fg"]
+        / props["k_v"]
+        * (G * rho_delta / (props["rho_l"] + props["rho_v"])) ** (2.0 / 3.0)
+        * (props["sigma"] / (G * rho_delta)) ** 0.5
+        * (props["mu_v"] / (G * rho_delta)) ** (1.0 / 3.0)
+    )
+    return props["tsat_c"] + delta_t_b, delta_t_b
+
+
+def henry_copper_mfb_temperature_c(props: dict[str, float], t_berenson_c: float, delta_t_b_k: float) -> float:
+    """Henry wall-effusivity correction for an oxygen-free copper heater."""
+    rho_cu = 8960.0
+    k_cu = 391.0
+    cp_cu = 385.0
+    effusivity_ratio = np.sqrt(
+        props["rho_l"] * props["k_l"] * props["cp_l"] / (rho_cu * k_cu * cp_cu)
+    )
+    correction = 0.5 * delta_t_b_k * (
+        effusivity_ratio * props["h_fg"] / (props["cp_l"] * delta_t_b_k)
+    ) ** 0.6
+    return t_berenson_c + correction
+
+
+def temperature_model_curves() -> pd.DataFrame:
+    rows = []
+    for pressure_kpa in np.linspace(1.0, 110.0, 220):
+        props = water_saturation_props(float(pressure_kpa))
+        t_berenson_c, delta_t_b_k = berenson_mfb_temperature_c(props)
+        rows.append(
+            {
+                "pressure_kpa": pressure_kpa,
+                "T_sat_C": props["tsat_c"],
+                "DeltaT_MFB_Berenson_K": delta_t_b_k,
+                "T_MFB_Berenson_C": t_berenson_c,
+                "T_MFB_Henry_Cu_C": henry_copper_mfb_temperature_c(props, t_berenson_c, delta_t_b_k),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def add_surface_points(ax: plt.Axes, data: pd.DataFrame, x_col: str, y_col: str, label: bool = True) -> None:
     for surface, style in SURFACE_STYLE.items():
         subset = data[data["surface"] == surface]
@@ -302,7 +396,12 @@ def savefig(fig: plt.Figure, output_dir: Path, name: str) -> None:
     plt.close(fig)
 
 
-def make_plots(data: pd.DataFrame, fit_table: pd.DataFrame, output_dir: Path) -> pd.DataFrame:
+def make_plots(
+    data: pd.DataFrame,
+    fit_table: pd.DataFrame,
+    output_dir: Path,
+    protocol_data: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     plots_dir = output_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
@@ -351,6 +450,7 @@ def make_plots(data: pd.DataFrame, fit_table: pd.DataFrame, output_dir: Path) ->
     ax.set_xlabel("Pressure, P (kPa)")
     ax.set_ylabel(r"NBR wall superheat, $T_{\mathrm{NBR}}-T_{\mathrm{sat}}$ (K)")
     ax.set_ylim(0, 40)
+    ax.set_xticks(np.arange(10, 111, 20))
     style_grid(ax)
     ax.legend(loc="upper right")
     savefig(fig, plots_dir, "fig04_nbr_wall_superheat_vs_pressure")
@@ -373,33 +473,110 @@ def make_plots(data: pd.DataFrame, fit_table: pd.DataFrame, output_dir: Path) ->
     qmodel = pd.DataFrame(qmodel_rows)
     qmodel.to_csv(output_dir / "qnbr_rohsenow_comparison.csv", index=False)
 
-    fig, ax = plt.subplots(figsize=(5.4, 4.8), constrained_layout=True)
-    for surface, style in SURFACE_STYLE.items():
-        subset = qmodel[qmodel["surface"] == surface]
-        ax.scatter(
-            subset["q_NBR_rohsenow_Csf_0p0128_W_cm2"],
-            subset["q_NBR_exp_W_cm2"],
-            s=58,
-            marker=style["marker"],
-            facecolor=style["color"],
-            edgecolor="black",
-            linewidth=0.7,
-            label=style["label"],
-            zorder=10,
-        )
+    sensitivity_rows = []
+    for c_sf, column in [
+        (0.0128, "q_NBR_rohsenow_Csf_0p0128_W_cm2"),
+        (0.0107, "q_NBR_rohsenow_Csf_0p0107_W_cm2"),
+    ]:
+        for surface in [*SURFACE_STYLE, "All"]:
+            subset = qmodel if surface == "All" else qmodel[qmodel["surface"] == surface]
+            ratio = subset["q_NBR_exp_W_cm2"] / subset[column]
+            sensitivity_rows.append(
+                {
+                    "C_sf": c_sf,
+                    "surface": surface,
+                    "n": len(subset),
+                    "median_exp_over_model": ratio.median(),
+                    "min_exp_over_model": ratio.min(),
+                    "max_exp_over_model": ratio.max(),
+                    "n_within_30pct": int(((ratio >= 0.7) & (ratio <= 1.3)).sum()),
+                }
+            )
+    pd.DataFrame(sensitivity_rows).to_csv(output_dir / "qnbr_rohsenow_sensitivity_summary.csv", index=False)
+
+    fig, axes = plt.subplots(1, 2, figsize=(7.5, 3.55), constrained_layout=True)
     lim = [0, 115]
-    ax.plot(lim, lim, color="black", lw=1.6, label="Rohsenow model")
-    ax.plot(lim, [1.3 * v for v in lim], color="black", ls="--", lw=1.2)
-    ax.plot(lim, [0.7 * v for v in lim], color="black", ls="--", lw=1.2)
-    ax.text(65, 1.3 * 65, "+30%", ha="left", va="bottom", rotation=47)
-    ax.text(80, 0.7 * 80, "-30%", ha="left", va="bottom", rotation=30)
-    ax.set_xlim(lim)
-    ax.set_ylim(lim)
-    ax.set_xlabel(r"Model-predicted $q''_{\mathrm{NBR}}(T_{\mathrm{NBR}})$ (W/cm$^2$)")
-    ax.set_ylabel(r"Experimental $q''_{\mathrm{NBR}}$ (W/cm$^2$)")
-    style_grid(ax)
-    ax.legend(loc="lower right")
+    for panel, (ax, c_sf, column) in enumerate(
+        zip(
+            axes,
+            [0.0128, 0.0107],
+            ["q_NBR_rohsenow_Csf_0p0128_W_cm2", "q_NBR_rohsenow_Csf_0p0107_W_cm2"],
+        )
+    ):
+        for surface, style in SURFACE_STYLE.items():
+            subset = qmodel[qmodel["surface"] == surface]
+            ax.scatter(
+                subset[column],
+                subset["q_NBR_exp_W_cm2"],
+                s=50,
+                marker=style["marker"],
+                facecolor=style["color"],
+                edgecolor="black",
+                linewidth=0.7,
+                label=style["label"],
+                zorder=10,
+            )
+        ax.fill_between(lim, [0.7 * v for v in lim], [1.3 * v for v in lim], color="0.9", zorder=1)
+        ax.plot(lim, lim, color="black", lw=1.6, label="Rohsenow model", zorder=3)
+        ax.plot(lim, [1.3 * v for v in lim], color="black", ls="--", lw=1.0, zorder=2)
+        ax.plot(lim, [0.7 * v for v in lim], color="black", ls="--", lw=1.0, zorder=2)
+        ax.text(
+            78,
+            1.3 * 78 + 2,
+            "+30%",
+            rotation=np.degrees(np.arctan(1.3)),
+            fontsize=7.5,
+            ha="center",
+            va="bottom",
+            zorder=4,
+        )
+        ax.text(
+            96,
+            0.7 * 96 - 3,
+            "-30%",
+            rotation=np.degrees(np.arctan(0.7)),
+            fontsize=7.5,
+            ha="center",
+            va="top",
+            zorder=4,
+        )
+        ax.set_xlim(lim)
+        ax.set_ylim(lim)
+        ax.set_box_aspect(1 / 1.125)
+        ax.set_xlabel(r"Model-predicted $q''_{\mathrm{NBR}}(T_{\mathrm{NBR}})$ (W/cm$^2$)", fontsize=10)
+        ax.set_ylabel(r"Experimental $q''_{\mathrm{NBR}}$ (W/cm$^2$)", fontsize=10)
+        ax.tick_params(labelsize=9)
+        ax.text(0.03, 0.97, f"({chr(97 + panel)})", transform=ax.transAxes, va="top", fontsize=9)
+        ax.text(0.04, 0.87, rf"$C_{{\mathrm{{sf}}}}={c_sf:.4f}$", transform=ax.transAxes, ha="left", fontsize=9)
+        style_grid(ax)
+    axes[1].legend(loc="lower right", fontsize=7.5)
     savefig(fig, plots_dir, "fig05_qnbr_rohsenow_parity")
+
+    temp_models = temperature_model_curves()
+    temp_models.to_csv(output_dir / "flat_mfb_temperature_models.csv", index=False)
+    flat = data[data["surface"] == "Flat Cu"].copy()
+    flat["series"] = "standard 30-case design"
+    flat_points = [flat]
+    if protocol_data is not None and not protocol_data.empty:
+        protocol_flat = protocol_data[protocol_data["surface"] == "Flat Cu"].copy()
+        protocol_flat["series"] = "10 kPa protocol validation"
+        flat_points.append(protocol_flat)
+    pd.concat(flat_points, ignore_index=True).to_csv(output_dir / "flat_mfb_regime_points.csv", index=False)
+
+    fig, ax = plt.subplots(figsize=(5.4, 4.8), constrained_layout=True)
+    ax.plot(temp_models["pressure_kpa"], temp_models["T_sat_C"], color="black", ls=":", lw=1.8, label=r"IAPWS $T_{\mathrm{sat}}$")
+    ax.plot(temp_models["pressure_kpa"], temp_models["T_MFB_Berenson_C"], color="#d97706", lw=2.0, label=r"Berenson $T_{\mathrm{MFB}}$")
+    ax.plot(temp_models["pressure_kpa"], temp_models["T_MFB_Henry_Cu_C"], color="#7c3aed", lw=2.0, label=r"Henry-Cu $T_{\mathrm{MFB}}$")
+    ax.scatter(flat["pressure_kpa"], flat["T_max_C"], s=58, marker="s", facecolor=SURFACE_STYLE["Flat Cu"]["color"], edgecolor="black", linewidth=0.7, label=r"Standard flat Cu, $T_{\mathrm{max}}$", zorder=10)
+    if protocol_data is not None and not protocol_data.empty:
+        ax.scatter(protocol_flat["pressure_kpa"], protocol_flat["T_max_C"], s=66, marker="D", facecolor="0.65", edgecolor="black", linewidth=0.8, label=r"Protocol validation, $T_{\mathrm{max}}$", zorder=11)
+    ax.set_xlim(1, 110)
+    ax.set_ylim(0, 280)
+    ax.set_xlabel("Pressure, P (kPa)")
+    ax.set_ylabel("Temperature, T (°C)")
+    style_grid(ax)
+    ax.legend(loc="upper left", fontsize=9)
+    savefig(fig, plots_dir, "fig07_flat_mfb_regime_check")
 
     if {"onb_vf", "chf_vf", "nbr_vf"}.issubset(data.columns):
         vf_long = data.melt(
@@ -517,7 +694,12 @@ def make_plots(data: pd.DataFrame, fit_table: pd.DataFrame, output_dir: Path) ->
 
 
 def write_model_diagnostics(
-    data: pd.DataFrame, fit_table: pd.DataFrame, output_dir: Path, input_path: Path
+    data: pd.DataFrame,
+    fit_table: pd.DataFrame,
+    output_dir: Path,
+    input_path: Path,
+    protocol_data: pd.DataFrame | None = None,
+    protocol_path: Path | None = None,
 ) -> None:
     pressure_grid = np.linspace(10.0, 100.0, 91)
     rows = []
@@ -546,6 +728,10 @@ def write_model_diagnostics(
         "deltaT_NBR_std_K": float(data["DeltaT_NBR_K"].std(ddof=1)),
         "fit_results": fit_table.to_dict(orient="records"),
     }
+    if protocol_data is not None and protocol_path is not None:
+        summary["protocol_validation_file"] = str(protocol_path.resolve())
+        summary["protocol_validation_sha256"] = hashlib.sha256(protocol_path.read_bytes()).hexdigest()
+        summary["n_protocol_validation_cases"] = int(len(protocol_data))
     (output_dir / "analysis_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
 
@@ -559,6 +745,10 @@ This folder is generated by `scripts/run_boiling_hysteresis_analysis.py`.
 The input is the organized 30-case spreadsheet (`MS Thesis Data_30cases.xlsx`).
 The runner reads thermal summary quantities, NBR temperature, and optional
 BubbleID side-view vapor-fraction / bubble-count columns.
+
+An optional five-case flat-copper protocol spreadsheet can be supplied with
+`--protocol-data`. Those approximately 10 kPa cases are written separately and
+are not included in the 30-case parameter fits.
 
 ## Core Models
 
@@ -584,7 +774,8 @@ For submission diagnostics, run
 `scripts/run_boiling_hysteresis_submission_diagnostics.py`. That script fixes
 `H_min = 0` as a parsimonious boundary condition, compares candidate models by
 AICc and held-out validation, tests residual structure, profiles `H_min`, and
-generates 2,000-resample bootstrap intervals. The preferred model uses
+generates 2,000 pressure-block bootstrap intervals. It also evaluates the
+locked fits against the optional protocol cases. The preferred model uses
 `(T_max - T_sat)/(T_ref - T_sat)`; it should be treated as a semi-empirical
 interpolation, not as a universal stability law.
 
@@ -600,11 +791,14 @@ The diagnostic
   superheat.
 - `fig04_nbr_wall_superheat_vs_pressure`: NBR wall-superheat band, supporting
   temperature-controlled rewetting.
-- `fig05_qnbr_rohsenow_parity`: comparison of q''_NBR(T_NBR) against the
-  Rohsenow nucleate-boiling correlation using `C_sf = 0.0128`.
+- `fig05_qnbr_rohsenow_parity`: sensitivity of q''_NBR(T_NBR) to the
+  Rohsenow liquid-surface coefficient (`C_sf = 0.0128` and `0.0107`).
 - `fig06_bubbleid_vapor_fraction_by_stage`: two-panel BubbleID diagnostic
   showing (a) side-view vapor fraction at ONB, CHF, and NBR and (b) vapor
   persistence, `VF_NBR/VF_CHF`, versus the boiling hysteresis ratio.
+- `fig07_flat_mfb_regime_check`: flat-copper regime check against Berenson and
+  Henry minimum-film-boiling temperatures; structured surfaces are omitted
+  because no validated geometry-specific MFB model is available.
 
 ## Notes
 
@@ -624,6 +818,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA, help="Organized hysteresis spreadsheet.")
     parser.add_argument("--sheet", default=DEFAULT_SHEET, help="Worksheet name in the spreadsheet.")
     parser.add_argument(
+        "--protocol-data",
+        type=Path,
+        default=None,
+        help="Optional workbook containing held-out cases Boiling-420--424.",
+    )
+    parser.add_argument("--protocol-sheet", default=DEFAULT_SHEET, help="Worksheet for protocol validation data.")
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path("manuscripts/boiling_hysteresis_subatmospheric/generated"),
@@ -640,10 +841,21 @@ def main() -> None:
 
     data = load_hysteresis_dataset(args.data, args.sheet)
     data.to_csv(output_dir / "processed_hysteresis_data.csv", index=False)
+    protocol_data = None
+    if args.protocol_data is not None:
+        protocol_data = load_protocol_validation(args.protocol_data, args.protocol_sheet)
+        protocol_data.to_csv(output_dir / "protocol_validation_data.csv", index=False)
     fit_table, _ = fit_models(data)
     fit_table.to_csv(output_dir / "hysteresis_fit_summary.csv", index=False)
-    make_plots(data, fit_table, output_dir)
-    write_model_diagnostics(data, fit_table, output_dir, args.data)
+    make_plots(data, fit_table, output_dir, protocol_data=protocol_data)
+    write_model_diagnostics(
+        data,
+        fit_table,
+        output_dir,
+        args.data,
+        protocol_data=protocol_data,
+        protocol_path=args.protocol_data,
+    )
     write_readme(output_dir)
     print(f"Wrote hysteresis analysis outputs to {output_dir.resolve()}")
 
