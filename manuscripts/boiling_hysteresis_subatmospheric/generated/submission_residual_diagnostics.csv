@@ -1,0 +1,17 @@
+model,diagnostic,value,p_value
+stretched_Hmin0,residual_vs_pressure_linear_slope_per_kPa,-0.0006913828359699814,0.006814926716329691
+stretched_Hmin0,residual_vs_pressure_spearman_r,-0.36794663460102195,0.04544673357159716
+stretched_Hmin0,residual_surface_one_way_ANOVA_F,3.104878018471792,0.061139807297384684
+stretched_Hmin0,DeltaT_s_K,162.0911104751448,
+stretched_Hmin0,m,1.9562774475414366,
+stretched_Hmin0,mean_residual_Flat Cu,-0.01946720657480685,
+stretched_Hmin0,mean_residual_New MC Cu,0.021977589088216575,
+stretched_Hmin0,mean_residual_MP Cu,-0.010194757219092155,
+Tref_Hmin0,residual_vs_pressure_linear_slope_per_kPa,-0.0001844396283714146,0.4035177247275853
+Tref_Hmin0,residual_vs_pressure_spearman_r,-0.1266555566170487,0.504811968874656
+Tref_Hmin0,residual_surface_one_way_ANOVA_F,2.4211943874800714,0.1078536058567003
+Tref_Hmin0,T_ref_C,264.59191543271606,
+Tref_Hmin0,m,1.6592525243886587,
+Tref_Hmin0,mean_residual_Flat Cu,-0.002273682661437382,
+Tref_Hmin0,mean_residual_New MC Cu,0.015771406050624125,
+Tref_Hmin0,mean_residual_MP Cu,-0.016095837081502862,

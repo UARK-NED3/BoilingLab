@@ -8,7 +8,7 @@ The input is the organized 30-case spreadsheet (`MS Thesis Data_30cases.xlsx`).
 The runner reads thermal summary quantities, NBR temperature, and optional
 BubbleID side-view vapor-fraction / bubble-count columns.
 
-## Core Model
+## Core Models
 
 The manuscript-level hysteresis coordinate is
 
@@ -16,20 +16,27 @@ The manuscript-level hysteresis coordinate is
 H = q''_NBR / q''_CHF
 ```
 
-and the main semi-empirical thermal-maturity model is
+and the constant-superheat baseline is
 
 ```text
 H = H_min + (1 - H_min) exp[-((T_max - T_sat) / DeltaT_s)^m].
 ```
 
-The script also fits a pressure-dependent reference-temperature form,
+The public runner also fits the pressure-dependent reference-temperature form,
 
 ```text
 H = H_min + (1 - H_min) exp[-((T_max - T_sat) / (T_ref - T_sat))^m].
 ```
 
-`H_min` is interpreted as the unresolved lower hysteresis asymptote for a
-fully matured post-CHF dry/vapor state. The diagnostic
+For submission diagnostics, run
+`scripts/run_boiling_hysteresis_submission_diagnostics.py`. That script fixes
+`H_min = 0` as a parsimonious boundary condition, compares candidate models by
+AICc and held-out validation, tests residual structure, profiles `H_min`, and
+generates 2,000-resample bootstrap intervals. The preferred model uses
+`(T_max - T_sat)/(T_ref - T_sat)`; it should be treated as a semi-empirical
+interpolation, not as a universal stability law.
+
+The diagnostic
 `theoretical_hmin_diagnostic.csv` compares it against a hydrodynamic
 `q''_MHF / q''_CHF` scale from Berenson/Zuber-type limiting heat fluxes.
 
@@ -51,4 +58,8 @@ fully matured post-CHF dry/vapor state. The diagnostic
 
 BubbleID vapor fraction is a side-view projected metric. It is useful as a
 regime diagnostic but should not be interpreted as the true wall dry-area
-fraction.
+fraction. The current fine-tuned model used all 24 labeled images for training,
+so these optical quantities are descriptive rather than held-out validation
+metrics. The thermal design contains one test per pressure--surface condition;
+cross-validation does not replace repeat experiments or a propagated
+measurement-uncertainty budget.

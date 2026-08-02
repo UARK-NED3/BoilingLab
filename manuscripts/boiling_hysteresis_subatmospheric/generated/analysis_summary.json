@@ -1,4 +1,6 @@
 {
+  "input_file": "C:\\Users\\hanhu\\Box\\NED3_Share\\Abrar Hoq Fahim\\BubbleID-FineTuning\\MS Thesis Data_30cases_abrar.xlsx",
+  "input_sha256": "b49ae44868f149836d27dbbce5422572d57ae4888bcb10fc800fc85e585b0ece",
   "n_cases": 30,
   "surfaces": [
     "Flat Cu",
@@ -14,19 +16,19 @@
   "fit_results": [
     {
       "model": "constant_deltaT_scale",
-      "h_min": 1.2337398836228408e-19,
-      "scale": 162.09137744914239,
-      "m": 1.9562707952564433,
-      "r2": 0.9020121903862895,
-      "rmse": 0.04115074995786829
+      "h_min": 0.0,
+      "scale": 162.0911095806199,
+      "m": 1.9562774690314044,
+      "r2": 0.9020121903824188,
+      "rmse": 0.04115074995868107
     },
     {
       "model": "pressure_dependent_Tref_scale",
-      "h_min": 0.17710399840655547,
-      "scale": 238.98105279632713,
-      "m": 1.6876262247820801,
-      "r2": 0.9357296699427976,
-      "rmse": 0.033327059337906716
+      "h_min": 0.0,
+      "scale": 264.5918853667119,
+      "m": 1.6592530319101357,
+      "r2": 0.935177484712356,
+      "rmse": 0.03346991959410343
     }
   ]
 }

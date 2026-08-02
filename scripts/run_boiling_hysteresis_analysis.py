@@ -16,6 +16,7 @@ single-case and multi-case tools already present in BoilingLab.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,7 +39,9 @@ except ImportError as exc:  # pragma: no cover - exercised by user environment
     ) from exc
 
 
-DEFAULT_DATA = Path(r"C:\Users\hanhu\Box\NED3_Share\Zulkar Nain Prince\MS Thesis Data_30cases.xlsx")
+DEFAULT_DATA = Path(
+    r"C:\Users\hanhu\Box\NED3_Share\Abrar Hoq Fahim\BubbleID-FineTuning\MS Thesis Data_30cases_abrar.xlsx"
+)
 DEFAULT_SHEET = "MS Thesis"
 G = 9.80665
 
@@ -178,24 +181,26 @@ def fit_models(data: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, np.ndarray]]
     tmax = data["T_max_C"].to_numpy(float)
     tsat = data["T_sat_C"].to_numpy(float)
 
-    popt_const, _ = curve_fit(
-        hysteresis_constant_scale,
+    popt_const_fixed, _ = curve_fit(
+        lambda x, delta_t_s, m: hysteresis_constant_scale(x, 0.0, delta_t_s, m),
         dt,
         y,
-        p0=(0.05, 160.0, 2.0),
-        bounds=([0.0, 1.0, 0.1], [1.0, 1000.0, 8.0]),
+        p0=(160.0, 2.0),
+        bounds=([1.0, 0.1], [1000.0, 8.0]),
         maxfev=100_000,
     )
+    popt_const = np.array([0.0, *popt_const_fixed])
     pred_const = hysteresis_constant_scale(dt, *popt_const)
 
-    popt_tref, _ = curve_fit(
-        hysteresis_tref_scale,
+    popt_tref_fixed, _ = curve_fit(
+        lambda inputs, t_ref_c, m: hysteresis_tref_scale(inputs, 0.0, t_ref_c, m),
         (tmax, tsat),
         y,
-        p0=(0.05, 260.0, 2.0),
-        bounds=([0.0, float(np.nanmax(tsat) + 1.0), 0.1], [1.0, 600.0, 8.0]),
+        p0=(260.0, 2.0),
+        bounds=([float(np.nanmax(tsat) + 1.0), 0.1], [600.0, 8.0]),
         maxfev=100_000,
     )
+    popt_tref = np.array([0.0, *popt_tref_fixed])
     pred_tref = hysteresis_tref_scale((tmax, tsat), *popt_tref)
 
     def score(name: str, params: tuple[float, float, float], pred: np.ndarray) -> FitResult:
@@ -511,7 +516,9 @@ def make_plots(data: pd.DataFrame, fit_table: pd.DataFrame, output_dir: Path) ->
     return qmodel
 
 
-def write_model_diagnostics(data: pd.DataFrame, fit_table: pd.DataFrame, output_dir: Path) -> None:
+def write_model_diagnostics(
+    data: pd.DataFrame, fit_table: pd.DataFrame, output_dir: Path, input_path: Path
+) -> None:
     pressure_grid = np.linspace(10.0, 100.0, 91)
     rows = []
     for pressure in pressure_grid:
@@ -530,6 +537,8 @@ def write_model_diagnostics(data: pd.DataFrame, fit_table: pd.DataFrame, output_
     pd.DataFrame(rows).to_csv(output_dir / "theoretical_hmin_diagnostic.csv", index=False)
 
     summary = {
+        "input_file": str(input_path.resolve()),
+        "input_sha256": hashlib.sha256(input_path.read_bytes()).hexdigest(),
         "n_cases": int(len(data)),
         "surfaces": sorted(data["surface"].dropna().unique().tolist()),
         "pressure_range_kPa": [float(data["pressure_kpa"].min()), float(data["pressure_kpa"].max())],
@@ -551,7 +560,7 @@ The input is the organized 30-case spreadsheet (`MS Thesis Data_30cases.xlsx`).
 The runner reads thermal summary quantities, NBR temperature, and optional
 BubbleID side-view vapor-fraction / bubble-count columns.
 
-## Core Model
+## Core Models
 
 The manuscript-level hysteresis coordinate is
 
@@ -559,20 +568,27 @@ The manuscript-level hysteresis coordinate is
 H = q''_NBR / q''_CHF
 ```
 
-and the main semi-empirical thermal-maturity model is
+and the constant-superheat baseline is
 
 ```text
 H = H_min + (1 - H_min) exp[-((T_max - T_sat) / DeltaT_s)^m].
 ```
 
-The script also fits a pressure-dependent reference-temperature form,
+The public runner also fits the pressure-dependent reference-temperature form,
 
 ```text
 H = H_min + (1 - H_min) exp[-((T_max - T_sat) / (T_ref - T_sat))^m].
 ```
 
-`H_min` is interpreted as the unresolved lower hysteresis asymptote for a
-fully matured post-CHF dry/vapor state. The diagnostic
+For submission diagnostics, run
+`scripts/run_boiling_hysteresis_submission_diagnostics.py`. That script fixes
+`H_min = 0` as a parsimonious boundary condition, compares candidate models by
+AICc and held-out validation, tests residual structure, profiles `H_min`, and
+generates 2,000-resample bootstrap intervals. The preferred model uses
+`(T_max - T_sat)/(T_ref - T_sat)`; it should be treated as a semi-empirical
+interpolation, not as a universal stability law.
+
+The diagnostic
 `theoretical_hmin_diagnostic.csv` compares it against a hydrodynamic
 `q''_MHF / q''_CHF` scale from Berenson/Zuber-type limiting heat fluxes.
 
@@ -594,7 +610,11 @@ fully matured post-CHF dry/vapor state. The diagnostic
 
 BubbleID vapor fraction is a side-view projected metric. It is useful as a
 regime diagnostic but should not be interpreted as the true wall dry-area
-fraction.
+fraction. The current fine-tuned model used all 24 labeled images for training,
+so these optical quantities are descriptive rather than held-out validation
+metrics. The thermal design contains one test per pressure--surface condition;
+cross-validation does not replace repeat experiments or a propagated
+measurement-uncertainty budget.
 """
     (output_dir / "README.md").write_text(text, encoding="utf-8")
 
@@ -623,7 +643,7 @@ def main() -> None:
     fit_table, _ = fit_models(data)
     fit_table.to_csv(output_dir / "hysteresis_fit_summary.csv", index=False)
     make_plots(data, fit_table, output_dir)
-    write_model_diagnostics(data, fit_table, output_dir)
+    write_model_diagnostics(data, fit_table, output_dir, args.data)
     write_readme(output_dir)
     print(f"Wrote hysteresis analysis outputs to {output_dir.resolve()}")
 

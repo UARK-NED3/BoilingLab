@@ -10,7 +10,7 @@ organized 30-case summary spreadsheet rather than raw `.lvm` files.
 Default local input:
 
 ```text
-C:\Users\hanhu\Box\NED3_Share\Zulkar Nain Prince\MS Thesis Data_30cases.xlsx
+C:\Users\hanhu\Box\NED3_Share\Abrar Hoq Fahim\BubbleID-FineTuning\MS Thesis Data_30cases_abrar.xlsx
 ```
 
 Worksheet:
@@ -31,6 +31,7 @@ From the repository root:
 
 ```powershell
 python scripts\run_boiling_hysteresis_analysis.py
+python scripts\run_boiling_hysteresis_submission_diagnostics.py
 ```
 
 To use a different spreadsheet:
@@ -59,13 +60,31 @@ where `q''_CHF` is the heating-branch critical heat flux and `q''_NBR` is the
 cooling-branch heat flux at which the boiling curve returns to the nucleate
 boiling branch.
 
-The primary semi-empirical collapse uses the maximum post-CHF wall superheat:
+The constant-superheat baseline uses the maximum post-CHF wall superheat:
 
 ```text
 H = H_min + (1 - H_min) exp[-((T_max - T_sat) / DeltaT_s)^m].
 ```
 
-Here:
+For the current dataset, the free-asymptote constant-scale fit reaches the
+lower bound. The submission analysis therefore fixes `H_min = 0` as a
+parsimonious boundary condition and tests its identifiability separately.
+
+The preferred manuscript model uses a pressure-adjusted reference-temperature
+coordinate:
+
+```text
+xi = (T_max - T_sat) / (T_ref - T_sat)
+H = exp[-xi^m].
+```
+
+The diagnostics script compares this model with constant-superheat,
+pressure-only, explicit pressure-correction, surface-offset, and free-asymptote
+alternatives. It reports AICc, leave-one-case-out error, leave-one-pressure-out
+and leave-one-surface-out validation, residual tests, a profile analysis for
+`H_min`, and 2,000 stratified bootstrap resamples.
+
+Parameters in the general stretched-exponential form are interpreted as:
 
 - `H_min` is the unresolved lower hysteresis asymptote for a fully matured
   dry/vapor state.
@@ -73,13 +92,7 @@ Here:
   state matures.
 - `m` is a shape/cooperativity exponent for the thermal-maturity process.
 
-The runner also evaluates a pressure-dependent reference-temperature form:
-
-```text
-H = H_min + (1 - H_min) exp[-((T_max - T_sat) / (T_ref - T_sat))^m].
-```
-
-NBR temperature is analyzed independently through
+NBR temperature is analyzed as a complementary output through
 `T_NBR - T_sat`. A narrow NBR wall-superheat band supports the interpretation
 that return to nucleate boiling is a temperature-controlled rewetting event,
 not simply CHF in reverse.
@@ -91,6 +104,8 @@ not simply CHF in reverse.
 - `fig02_hysteresis_vs_pressure`: hysteresis ratio versus pressure.
 - `fig03_hysteresis_constant_scale_fit`: global hysteresis collapse versus
   `T_max - T_sat`.
+- `fig03_hysteresis_model_comparison`: constant-superheat baseline and the
+  preferred pressure-adjusted model with bootstrap intervals.
 - `fig04_nbr_wall_superheat_vs_pressure`: NBR wall superheat versus pressure.
 - `fig05_qnbr_rohsenow_parity`: experimental `q''_NBR` versus
   Rohsenow-predicted `q''_NBR(T_NBR)` using `C_sf = 0.0128`.
@@ -108,9 +123,23 @@ not simply CHF in reverse.
 - `theoretical_hmin_diagnostic.csv`: hydrodynamic lower-bound diagnostic using
   Zuber CHF and a Berenson-type minimum-heat-flux scale.
 - `analysis_summary.json`: compact machine-readable summary of the run.
+- `submission_model_diagnostics.csv`: candidate-model comparison with AICc and
+  leave-one-case-out error.
+- `hysteresis_cross_validation.csv`: held-out pressure and surface predictions.
+- `submission_residual_diagnostics.csv`: residual pressure and surface tests.
+- `hmin_profile_likelihood.csv`: profile analysis for the lower asymptote.
+- `hysteresis_*_bootstrap_curve.csv`: bootstrap curve intervals.
+- `submission_diagnostics.md`: concise numerical audit used for the manuscript.
 
 ## Interpretation Caveat
 
 BubbleID vapor fraction is a projected side-view quantity. It is useful for
 regime classification and for comparing ONB/CHF/NBR image states, but it is not
-a direct measurement of wall dry-area fraction.
+a direct measurement of wall dry-area fraction. The current fine-tuned model
+used all 24 labeled images during training, so the optical metrics are
+descriptive and are not an independently validated segmentation benchmark.
+
+The thermal dataset contains one test at each pressure--surface condition.
+Grouped validation measures interpolation across the design but does not
+replace experimental replication or a propagated measurement-uncertainty
+budget.
