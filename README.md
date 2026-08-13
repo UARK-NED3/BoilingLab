@@ -14,6 +14,8 @@ codes, and multimodal data synchronization and analysis codes.
   heater enclosure, environmental-control, surface-preparation, degassing,
   heat-load-selection, and test-sequence documentation consolidated from the
   MSME thesis materials.
+- `docs/data_acquisition_and_control.md`: documented DAQ, control, logging,
+  synchronization, and operator-decision workflow for the thesis facility.
 - `docs/data_reduction.md`: thermal reconstruction, heat-flux calculation,
   pressure/saturation assumptions, event definitions, heating-branch filtering,
   hysteresis metrics, BubbleID vapor-state metrics, and reproducibility checks.
@@ -61,6 +63,10 @@ the raw files and generated analysis outputs:
   surface preparation, DI-water degassing, saturation and pressure control,
   transient heat-load selection, and the ONB -> NB -> CHF -> TB -> NBR -> NB
   test sequence.
+- [DAQ and control workflow](docs/data_acquisition_and_control.md) identifies
+  the documented hardware, sampling rates, acquisition products, manual
+  controls, and the boundary between this repository's analysis code and the
+  LabVIEW control VIs.
 - [Data reduction](docs/data_reduction.md) documents the four-thermocouple
   linear conduction model, wall-temperature extrapolation, Fourier-law heat
   flux calculation, wall superheat, HTC, heating-branch filtering, CHF/NBR

@@ -5,6 +5,23 @@ Ishraq Hossain's subatmospheric pool-boiling thesis experiments. They are meant
 to connect the physical experiment to the BoilingLab metadata and analysis
 scripts. They are not a standalone laboratory safety SOP.
 
+## Evidence Basis and Release Boundary
+
+This is **reported experimental-method documentation**, not a new facility
+qualification or an independently verified SOP. The facility dimensions,
+instrument models, operating targets, and procedural sequence were transcribed
+from Chapter 2 of Ishraq Hossain's MSME thesis (PDF pages 7--17 in the supplied
+file) and cross-checked against the defense presentation's experimental-setup,
+environmental-control, and heat-load-selection slides. The thesis and deck are
+the primary sources for this repository description.
+
+The repository contains post-processing and analysis code, not the custom
+LabVIEW facility VI or the modified MagnaDC control VI described in those
+sources. See [DAQ and control workflow](data_acquisition_and_control.md) for
+the documented behavior of those VIs and the resulting release gap. Do not
+infer hard interlocks, calibration traceability, uncertainty bounds, or an
+automated CHF shutdown from this documentation.
+
 ## Scope
 
 The thesis experiments used transient, quasi-steady pool boiling of deionized

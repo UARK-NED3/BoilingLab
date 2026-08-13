@@ -5,6 +5,9 @@ analysis scripts, metadata, and generated manuscript outputs.
 
 - [Experimental protocol](experimental_protocol.md): pool-boiling facility,
   heater enclosure, instrumentation, environmental control, and test sequence.
+- [DAQ and control workflow](data_acquisition_and_control.md): acquisition
+  hardware, logged products, manual controls, event handoff, and code-release
+  boundary.
 - [Data reduction](data_reduction.md): thermocouple extrapolation, heat-flux
   calculation, event definitions, heating-branch filtering, hysteresis metrics,
   and quality checks.
