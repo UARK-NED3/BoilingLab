@@ -16,6 +16,8 @@ codes, and multimodal data synchronization and analysis codes.
   MSME thesis materials.
 - `docs/data_acquisition_and_control.md`: documented DAQ, control, logging,
   synchronization, and operator-decision workflow for the thesis facility.
+- `hardware-system/`: visual facility reference with authorized thesis figures,
+  hardware identities/specifications, and component-level DAQ/control notes.
 - `docs/data_reduction.md`: thermal reconstruction, heat-flux calculation,
   pressure/saturation assumptions, event definitions, heating-branch filtering,
   hysteresis metrics, BubbleID vapor-state metrics, and reproducibility checks.
@@ -77,6 +79,16 @@ These files were added to make the analysis scripts traceable to the
 experimental methodology in Ishraq Hossain's MSME thesis draft and defense
 presentation. They intentionally avoid storing raw videos, large acquisition
 outputs, or private local source paths in git.
+
+## Hardware System Reference
+
+[`hardware-system/`](hardware-system/README.md) provides the visual hardware
+reference: annotated facility and chamber images, copper test-surface drawings,
+the LabVIEW monitoring screen, saturation/pressure-control evidence, heat-load
+selection evidence, and component-level specifications. The equipment identity
+and figures are reported from the supplied thesis and defense presentation;
+they are not a current inventory, wiring diagram, safety SOP, or calibration
+record.
 
 ## Environment Setup
 

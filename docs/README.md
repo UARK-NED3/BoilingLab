@@ -8,6 +8,8 @@ analysis scripts, metadata, and generated manuscript outputs.
 - [DAQ and control workflow](data_acquisition_and_control.md): acquisition
   hardware, logged products, manual controls, event handoff, and code-release
   boundary.
+- [Hardware system reference](../hardware-system/README.md): visual facility,
+  hardware specifications, and component-level DAQ/control documentation.
 - [Data reduction](data_reduction.md): thermocouple extrapolation, heat-flux
   calculation, event definitions, heating-branch filtering, hysteresis metrics,
   and quality checks.
