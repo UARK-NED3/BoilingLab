@@ -22,7 +22,7 @@ codes, and multimodal data synchronization and analysis codes.
   pressure/saturation assumptions, event definitions, heating-branch filtering,
   hysteresis metrics, BubbleID vapor-state metrics, and reproducibility checks.
 - `demos/Boiling-417`: example single-case run using raw data from
-  `Y:\0_Ishraq\New Pool Boiling Video\Boiling-417`.
+  `X:\0_Ishraq\New Pool Boiling Video\Boiling-417`.
 - `scripts/run_boiling_hysteresis_analysis.py`: manuscript-level analysis for
   the subatmospheric boiling hysteresis study using the organized 30-case
   spreadsheet.
@@ -35,19 +35,19 @@ Raw high-speed video and related acquisition files are stored outside this
 repository:
 
 ```text
-Y:\0_Ishraq\New Pool Boiling Video
+X:\0_Ishraq\New Pool Boiling Video
 ```
 
 Each folder under that raw-data root represents one test. The folder name is
 the `Test ID`, for example:
 
 ```text
-Y:\0_Ishraq\New Pool Boiling Video\Boiling-145
+X:\0_Ishraq\New Pool Boiling Video\Boiling-145
 ```
 
 Use `Test ID` to connect:
 
-1. the raw-data folder under `Y:\0_Ishraq\New Pool Boiling Video`,
+1. the raw-data folder under `X:\0_Ishraq\New Pool Boiling Video`,
 2. the corresponding row in `metadata/Pool Boiling Test Log.xlsx`, and
 3. the analysis case selected in `notebooks/Single_case_analysis_Subcooled.ipynb`.
 
@@ -114,7 +114,7 @@ python scripts\run_single_case_demo.py
 ```
 
 The default command analyzes `Boiling-417` from
-`Y:\0_Ishraq\New Pool Boiling Video\Boiling-417` and writes generated summary
+`X:\0_Ishraq\New Pool Boiling Video\Boiling-417` and writes generated summary
 files and plots to `demos\Boiling-417\generated`. A complete single-case run
 generates these eight required figures:
 
@@ -133,6 +133,30 @@ present. The hydrophone and AE waveform analyses compute band-integrated PSD
 scalars over time by integrating the PSD over frequency; these are
 voltage-squared acoustic-power proxies unless the sensors are calibrated to
 physical acoustic pressure.
+
+Every run additionally exports `thermal_timeseries.csv`,
+`thermal_timeseries.npz`, `critical_events.csv`, and `time_alignment.json`.
+Temperature is the unshifted reference time axis; pressure, DC power,
+hydrophone, and AE records are offset from their recorded clock starts when
+available. See [multimodal time alignment](docs/multimodal-time-alignment.md)
+for the equation, tolerance, and limits. The default `chf_proxy` event is not a
+confirmed CHF event unless the analyst explicitly records that status.
+
+## Reproduce the Boiling-424 Transient Thermal Reduction
+
+The transient notebook corresponds to the 9.98 kPa / 60 W case currently
+stored in `Boiling-424`. The following thermal-only command preserves that
+case metadata while avoiding an expensive waveform decode during an initial
+check:
+
+```powershell
+python scripts\run_single_case_demo.py --test-id Boiling-424 --analysis-mode transient --target-pressure-kpa 10 --applied-heat-load 60 --skip-sensors
+```
+
+`--target-pressure-kpa` and `--applied-heat-load` are run metadata supplied by
+the analyst; they are not inferred from the reconstructed heat-flux trace.
+Confirm them against the experiment record before reporting them. Remove
+`--skip-sensors` when the full hydrophone and AE analyses are required.
 
 The default run decodes the continuous acoustic-emission waveform from a `.wfs`
 stream file with `decode-wfs`, uses channel 1 by default, and writes the AE
@@ -179,7 +203,7 @@ python scripts\run_multi_case_comparison.py
 ```
 
 The script reads the raw folders under
-`Y:\0_Ishraq\New Pool Boiling Video`, looks up metadata in
+`X:\0_Ishraq\New Pool Boiling Video`, looks up metadata in
 `metadata\Pool Boiling Test Log.xlsx`, and writes combined plots plus CSV/JSON
 summaries to `demos\Boiling-412-413-416-417\generated`. By default, only the
 heating portion of each case is included: temperature samples are kept when the
