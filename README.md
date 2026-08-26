@@ -158,6 +158,11 @@ the analyst; they are not inferred from the reconstructed heat-flux trace.
 Confirm them against the experiment record before reporting them. Remove
 `--skip-sensors` when the full hydrophone and AE analyses are required.
 
+For a documented benchmark whose raw files sit directly in one directory and
+use a unique dataset prefix (for example, `BoilingBench-1_Temperature.lvm`),
+use `--case-folder <raw-directory>`. The runner resolves the uniquely prefixed
+versions of the standard modality filenames without renaming the raw files.
+
 The default run decodes the continuous acoustic-emission waveform from a `.wfs`
 stream file with `decode-wfs`, uses channel 1 by default, and writes the AE
 spectrogram, band-integrated power trace, and characteristic-frequency trace.
