@@ -6,7 +6,7 @@ This demo uses `Boiling-417` as a single-case example for
 ## Inputs
 
 - Test ID: `Boiling-417`
-- Raw data folder: `Y:\0_Ishraq\New Pool Boiling Video\Boiling-417`
+- Raw data folder: `X:\0_Ishraq\New Pool Boiling Video\Boiling-417`
 - Liquid subcooling input: `57.6 °C`
 - Applied heat-load input: `250 W/cm^2`
 - Test-log status: `Failure: CHF not reached`
@@ -49,6 +49,12 @@ time window and labels the result as `CHF`. Because the test log marks
 should be interpreted as the notebook's current marker/proxy, not as a confirmed
 physical CHF event.
 
+The reusable runner writes `thermal_timeseries.csv` and
+`thermal_timeseries.npz` (temperature-reference derived signals),
+`critical_events.csv` (event definitions and times), and `time_alignment.json`
+(recorded clock offsets and alignment limits). See
+[multimodal time alignment](../../docs/multimodal-time-alignment.md).
+
 ## Key Results
 
 | Quantity | Value |
@@ -74,7 +80,7 @@ physical CHF event.
 The full CSV export from the notebook was written to:
 
 ```text
-Y:\0_Ishraq\New Pool Boiling Video\Boiling-417\Boiling-417_csv_data.csv
+X:\0_Ishraq\New Pool Boiling Video\Boiling-417\Boiling-417_csv_data.csv
 ```
 
 ## Representative Plots

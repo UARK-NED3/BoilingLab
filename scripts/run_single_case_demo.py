@@ -26,6 +26,27 @@ from scipy.signal import correlate, correlation_lags, detrend, find_peaks, get_w
 from scipy.stats import linregress
 import matplotlib.ticker as mticker
 
+try:
+    from .time_alignment import (
+        ClockAlignmentRecord,
+        apply_clock_offset,
+        make_clock_alignment,
+        parse_easy_ae_start_datetime,
+        parse_lvm_start_datetime,
+        parse_wfs_filename_start_datetime,
+        unavailable_alignment,
+    )
+except ImportError:  # Supports `python scripts/run_single_case_demo.py`.
+    from time_alignment import (  # type: ignore[no-redef]
+        ClockAlignmentRecord,
+        apply_clock_offset,
+        make_clock_alignment,
+        parse_easy_ae_start_datetime,
+        parse_lvm_start_datetime,
+        parse_wfs_filename_start_datetime,
+        unavailable_alignment,
+    )
+
 
 TC_LOCATION_M = np.array([0, 2.54, 5.08, 7.62]) * 1e-3
 SURFACE_LOCATION_FLAT_CU_M = 13.1826e-3
@@ -98,17 +119,172 @@ def read_lvm(folder: Path, filename: str) -> pd.DataFrame:
     return pd.read_csv(folder / filename, skiprows=LVM_SKIP_ROWS, sep="\t")
 
 
-def parse_lvm_start_time_seconds(path: Path) -> float:
-    with path.open("r", encoding="utf-8", errors="ignore") as handle:
-        for line_number, line in enumerate(handle, start=1):
-            if line_number == 11:
-                token = re.split(r"\s+", line.strip(), maxsplit=1)[1]
-                if "." in token:
-                    hhmmss, frac = token.split(".", 1)
-                    token = f"{hhmmss}.{frac[:6]}"
-                hour, minute, second = token.split(":")
-                return int(hour) * 3600 + int(minute) * 60 + float(second)
-    raise ValueError(f"Could not read start time from {path}")
+def find_ae_dta_file(folder: Path) -> Path | None:
+    candidates = sorted(folder.glob("*.DTA")) + sorted(folder.glob("*.dta"))
+    return candidates[0] if candidates else None
+
+
+def lvm_clock_alignment(
+    modality: str,
+    source_path: Path,
+    temperature_path: Path,
+    temperature_clock,
+    tolerance_s: float,
+) -> ClockAlignmentRecord:
+    """Return a recorded-clock alignment, retaining unavailable/parse states."""
+    if not source_path.exists():
+        return unavailable_alignment(
+            modality,
+            temperature_path,
+            temperature_clock,
+            "source_file_not_available",
+            tolerance_s,
+        )
+    try:
+        return make_clock_alignment(
+            modality,
+            source_path,
+            temperature_path,
+            parse_lvm_start_datetime(source_path),
+            temperature_clock,
+            method="lvm_header_clock",
+            tolerance_s=tolerance_s,
+        )
+    except ValueError:
+        return unavailable_alignment(
+            modality,
+            temperature_path,
+            temperature_clock,
+            "source_clock_not_parsed",
+            tolerance_s,
+        )
+
+
+def external_clock_alignment(
+    modality: str,
+    source_path: Path | None,
+    temperature_path: Path,
+    temperature_clock,
+    tolerance_s: float,
+    parser,
+    method: str,
+) -> ClockAlignmentRecord:
+    """Create an alignment record for a non-LVM source with a recorded clock."""
+    if source_path is None or not source_path.exists():
+        return unavailable_alignment(
+            modality,
+            temperature_path,
+            temperature_clock,
+            "source_file_not_available",
+            tolerance_s,
+        )
+    try:
+        return make_clock_alignment(
+            modality,
+            source_path,
+            temperature_path,
+            parser(source_path),
+            temperature_clock,
+            method=method,
+            tolerance_s=tolerance_s,
+        )
+    except ValueError:
+        return unavailable_alignment(
+            modality,
+            temperature_path,
+            temperature_clock,
+            "source_clock_not_parsed",
+            tolerance_s,
+        )
+def interpolate_to_reference_time(
+    reference_time_s: np.ndarray, source_time_s: np.ndarray | None, source_values: np.ndarray | None
+) -> np.ndarray:
+    """Interpolate a separate clock-aligned trace onto the temperature time base.
+
+    Samples outside the source time range are explicitly marked missing; no
+    extrapolation is performed.
+    """
+    if source_time_s is None or source_values is None:
+        return np.full(len(reference_time_s), np.nan)
+    finite = np.isfinite(source_time_s) & np.isfinite(source_values)
+    if np.count_nonzero(finite) < 2:
+        return np.full(len(reference_time_s), np.nan)
+    return np.interp(reference_time_s, source_time_s[finite], source_values[finite], left=np.nan, right=np.nan)
+
+
+def write_derived_data_exports(
+    output_dir: Path,
+    *,
+    temp_data: dict[str, np.ndarray],
+    heat_transfer_coefficient: np.ndarray,
+    saturation_temperature_c: float,
+    pressure_time_s: np.ndarray | None,
+    pressure_kpa: np.ndarray | None,
+    dc_time_s: np.ndarray | None,
+    dc_power_w: np.ndarray | None,
+    summary: dict[str, object],
+    alignments: list[ClockAlignmentRecord],
+) -> None:
+    """Export derived thermal records, event times, and synchronization metadata.
+
+    Raw files stay outside the repository. CSV is convenient for inspection,
+    NPZ preserves numerical arrays, and JSON records the event/alignment
+    provenance needed to interpret the exported values.
+    """
+    time_s = temp_data["time_s"]
+    thermocouples = temp_data["thermocouples"]
+    wall_superheat_c = temp_data["surface_temperature"] - saturation_temperature_c
+    htc_valid = wall_superheat_c > 0
+    thermal_frame = pd.DataFrame(
+        {
+            "time_reference_temperature_s": time_s,
+            "thermocouple_1_C": thermocouples[:, 0],
+            "thermocouple_2_C": thermocouples[:, 1],
+            "thermocouple_3_C": thermocouples[:, 2],
+            "thermocouple_4_C": thermocouples[:, 3],
+            "surface_temperature_C": temp_data["surface_temperature"],
+            "heat_flux_W_cm2": temp_data["heat_flux"],
+            "linear_temperature_fit_R2": temp_data["r2"],
+            "saturation_temperature_C": np.full(len(time_s), saturation_temperature_c),
+            "wall_superheat_C": wall_superheat_c,
+            "heat_transfer_coefficient_W_cm2K": heat_transfer_coefficient,
+            "htc_valid_for_positive_wall_superheat": htc_valid,
+            "pressure_kPa_interpolated": interpolate_to_reference_time(time_s, pressure_time_s, pressure_kpa),
+            "dc_power_W_interpolated": interpolate_to_reference_time(time_s, dc_time_s, dc_power_w),
+        }
+    )
+    thermal_frame.to_csv(output_dir / "thermal_timeseries.csv", index=False)
+    np.savez_compressed(
+        output_dir / "thermal_timeseries.npz",
+        **{column: thermal_frame[column].to_numpy(dtype=float) for column in thermal_frame.columns},
+    )
+
+    event_definitions = [
+        ("dnb_proxy", "dnb_time_s", "algorithmic_sudden_heat_flux_drop", "screening"),
+        ("surface_temperature_peak", "peak_time_s", "maximum_surface_temperature_within_search_window", "derived"),
+        ("chf_proxy", "chf_proxy_time_s", "fixed_window_heat_flux_marker", str(summary["chf_event_status"])),
+        ("nbr_proxy", "nbr_time_s", "post-marker_heat_flux_maximum", "screening"),
+        ("dc_power_start", "dc_start_time_s", "first_nonzero_dc_power_sample", "derived"),
+        ("dc_power_shutoff", "dc_shutoff_time_s", "first_near_zero_dc_power_sample_after_start", "derived"),
+    ]
+    event_rows = [
+        {
+            "event_name": name,
+            "time_reference_temperature_s": summary[key],
+            "definition": definition,
+            "evidence_status": status,
+        }
+        for name, key, definition, status in event_definitions
+        if summary.get(key) is not None
+    ]
+    pd.DataFrame(event_rows).to_csv(output_dir / "critical_events.csv", index=False)
+    alignment_document = {
+        "reference_modality": "temperature",
+        "reference_time_definition": "Temperature.lvm Time (sec); temperature t=0 remains t=0.",
+        "records": [record.as_dict() for record in alignments],
+        "limits": "Clock headers provide offsets only. Drift, trigger latency, and sensor response delay are not inferred.",
+    }
+    (output_dir / "time_alignment.json").write_text(json.dumps(alignment_document, indent=2), encoding="utf-8")
 
 
 def first_max_index(values: np.ndarray, candidate_indices: np.ndarray, time: np.ndarray) -> int:
@@ -1290,6 +1466,7 @@ def save_hydrophone_analysis(
     dnb_time_s: float | None = None,
     peak_time_s: float | None = None,
     off_time_s: float | None = None,
+    clock_offset_s: float = 0.0,
 ) -> dict[str, object]:
     path = folder / "Hydrophones.lvm"
     if not path.exists():
@@ -1320,7 +1497,7 @@ def save_hydrophone_analysis(
         sep=r"\s+",
         engine="python",
     )[["Time", "Voltage"]]
-    hydrophones["Time"] = pd.to_numeric(hydrophones["Time"], errors="coerce")
+    hydrophones["Time"] = pd.to_numeric(hydrophones["Time"], errors="coerce") + clock_offset_s
     hydrophones["Voltage"] = pd.to_numeric(hydrophones["Voltage"], errors="coerce")
     hydrophones = hydrophones.dropna(subset=["Time", "Voltage"])
 
@@ -1347,6 +1524,7 @@ def save_hydrophone_analysis(
         nperseg=nperseg,
         noverlap=noverlap,
     )
+    times = times + clock_offset_s
     sxx_log = 10 * np.log10(sxx)
     freq_mask = frequencies <= 6e3
     masked_frequencies = frequencies[freq_mask]
@@ -1383,6 +1561,7 @@ def save_hydrophone_analysis(
         nperseg=nperseg,
         noverlap=noverlap,
     )
+    psd_times = psd_times + clock_offset_s
     band_integrated_power, band_integrated_power_db = integrate_band_power(
         psd_frequencies,
         psd_times,
@@ -1418,6 +1597,7 @@ def save_hydrophone_analysis(
         "hydrophone_available": True,
         "hydrophone_rows": int(len(hydrophones)),
         "hydrophone_sampling_frequency_Hz": float(sampling_frequency),
+        "hydrophone_clock_offset_s": float(clock_offset_s),
         "hydrophone_band_min_Hz": float(band_min_hz),
         "hydrophone_band_max_Hz": float(band_max_hz),
         "hydrophone_band_power_time_bins": int(len(psd_times)),
@@ -1533,7 +1713,7 @@ def read_ae_time(path: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def save_ae_analysis(folder: Path, plots_dir: Path) -> dict[str, object]:
+def save_ae_analysis(folder: Path, plots_dir: Path, clock_offset_s: float = 0.0) -> dict[str, object]:
     summary: dict[str, object] = {
         "ae_hit_available": (folder / "AE_Hit.TXT").exists(),
         "ae_time_available": (folder / "AE_Time.TXT").exists(),
@@ -1541,6 +1721,7 @@ def save_ae_analysis(folder: Path, plots_dir: Path) -> dict[str, object]:
 
     if summary["ae_hit_available"]:
         ae_hit = read_ae_hit(folder / "AE_Hit.TXT")
+        ae_hit["AE_Hit_Time"] = ae_hit["AE_Hit_Time"] + clock_offset_s
         plot_columns = [
             "PARA1",
             "RISE",
@@ -1571,11 +1752,13 @@ def save_ae_analysis(folder: Path, plots_dir: Path) -> dict[str, object]:
         fig.tight_layout()
         fig.savefig(plots_dir / "ae_hit_parameters.png", dpi=180, bbox_inches="tight")
         plt.close(fig)
+        ae_hit.to_csv(plots_dir.parent / "ae_hit_parameters_aligned.csv", index=False)
         summary["ae_hit_rows"] = int(len(ae_hit))
 
     if summary["ae_time_available"]:
         ae_time = read_ae_time(folder / "AE_Time.TXT")
         ae_time = ae_time.dropna(subset=["AE_Time", "PARA1", "RMS", "ABS-ENERGY", "ASL"])
+        ae_time["AE_Time"] = ae_time["AE_Time"] + clock_offset_s
         fig, axes = plt.subplots(2, 2, figsize=(14, 10), sharex=True)
         series = [("PARA1", "PARA1"), ("RMS", "RMS"), ("ABS-ENERGY", "ABS-ENERGY"), ("ASL", "ASL")]
         for ax, (column, ylabel) in zip(axes.ravel(), series):
@@ -1590,7 +1773,10 @@ def save_ae_analysis(folder: Path, plots_dir: Path) -> dict[str, object]:
         fig.tight_layout()
         fig.savefig(plots_dir / "ae_time_parameters.png", dpi=180, bbox_inches="tight")
         plt.close(fig)
+        ae_time.to_csv(plots_dir.parent / "ae_time_parameters_aligned.csv", index=False)
         summary["ae_time_rows"] = int(len(ae_time))
+
+    summary["ae_clock_offset_s"] = float(clock_offset_s)
 
     return summary
 
@@ -1654,6 +1840,7 @@ def save_wfs_ae_spectrogram(
     dnb_time_s: float | None = None,
     peak_time_s: float | None = None,
     off_time_s: float | None = None,
+    clock_offset_s: float = 0.0,
 ) -> dict[str, object]:
     wfs_path = find_wfs_file(folder)
     if wfs_path is None:
@@ -1705,6 +1892,7 @@ def save_wfs_ae_spectrogram(
         nperseg=nperseg,
         n_time_bins=px_wide,
     )
+    times = times + clock_offset_s
     sxx_db = 10 * np.log10(np.maximum(sxx, np.finfo(float).tiny))
     band_integrated_power, band_integrated_power_db = integrate_band_power(
         frequencies,
@@ -1778,6 +1966,7 @@ def save_wfs_ae_spectrogram(
         "ae_wfs_samples": int(len(raw)),
         "ae_wfs_duration_s": float(time_s[-1] - time_s[0]) if len(time_s) else None,
         "ae_wfs_sampling_frequency_Hz": sampling_rate,
+        "ae_wfs_clock_offset_s": float(clock_offset_s),
         "ae_wfs_samples_per_record": int(samples_per_record),
         "ae_wfs_spectrogram_time_bins": int(len(times)),
         "ae_wfs_spectrogram_frequency_bins": int(len(plot_frequencies)),
@@ -1830,9 +2019,65 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     plots_dir = output_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
+    temperature_path = folder / "Temperature.lvm"
+    pressure_path = folder / "Pressure.lvm"
+    dc_path = folder / "DC_power.lvm"
+    temperature_clock = parse_lvm_start_datetime(temperature_path)
+    temperature_alignment = make_clock_alignment(
+        "temperature",
+        temperature_path,
+        temperature_path,
+        temperature_clock,
+        temperature_clock,
+        method="temperature_reference_clock",
+        tolerance_s=args.clock_offset_tolerance_s,
+    )
+    pressure_alignment = lvm_clock_alignment(
+        "pressure", pressure_path, temperature_path, temperature_clock, args.clock_offset_tolerance_s
+    )
+    dc_alignment = lvm_clock_alignment(
+        "dc_power", dc_path, temperature_path, temperature_clock, args.clock_offset_tolerance_s
+    )
+    hydrophone_alignment = lvm_clock_alignment(
+        "hydrophone",
+        folder / "Hydrophones.lvm",
+        temperature_path,
+        temperature_clock,
+        args.clock_offset_tolerance_s,
+    )
+    ae_alignment = external_clock_alignment(
+        "acoustic_emission_parameters",
+        find_ae_dta_file(folder),
+        temperature_path,
+        temperature_clock,
+        args.clock_offset_tolerance_s,
+        parse_easy_ae_start_datetime,
+        "easy_ae_dta_clock",
+    )
+    wfs_alignment = external_clock_alignment(
+        "acoustic_emission_waveform",
+        find_wfs_file(folder),
+        temperature_path,
+        temperature_clock,
+        args.clock_offset_tolerance_s,
+        parse_wfs_filename_start_datetime,
+        "wfs_filename_clock",
+    )
+    alignments = [
+        temperature_alignment,
+        pressure_alignment,
+        dc_alignment,
+        hydrophone_alignment,
+        ae_alignment,
+        wfs_alignment,
+    ]
+
     temp = read_lvm(folder, "Temperature.lvm").rename(columns={"X_Value": "Time (sec)"})
     pressure_df = read_lvm(folder, "Pressure.lvm").rename(
         columns={"X_Value": "Time (sec)", "Voltage": "Pressure (kPa)"}
+    )
+    pressure_df["Time (sec)"] = apply_clock_offset(
+        pressure_df["Time (sec)"].to_numpy(dtype=float), pressure_alignment
     )
 
     temp_data = compute_temperature_quantities(temp)
@@ -1874,6 +2119,9 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     summary: dict[str, object] = {
         "test_id": test_id,
         "raw_folder": str(folder),
+        "analysis_mode": args.analysis_mode,
+        "temperature_reference_clock": temperature_clock.isoformat(),
+        "clock_offset_tolerance_s": float(args.clock_offset_tolerance_s),
         "applied_heat_load_W_cm2": args.applied_heat_load,
         "input_subcooling_C": args.subcooling,
         "duration_s": float(np.nanmax(time_s) - np.nanmin(time_s)),
@@ -1898,6 +2146,7 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         "peak_search_end_s": float(args.dnb_search_end_s),
         "chf_proxy_time_s": float(time_s[chf_idx]),
         "chf_proxy_W_cm2": float(heat_flux[chf_idx]),
+        "chf_event_status": args.chf_event_status,
         "htc_at_chf_proxy_W_cm2K": float(htc[chf_idx]),
         "nbr_time_s": float(time_s[nbr_idx]),
         "nbr_W_cm2": float(heat_flux[nbr_idx]),
@@ -1908,7 +2157,6 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         "plots_dir": str(plots_dir),
     }
 
-    dc_path = folder / "DC_power.lvm"
     dc_time = None
     power = None
     shut_time = None
@@ -1925,9 +2173,7 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
             }
         )
         power = dc["Output Power (W)"].to_numpy(dtype=float)
-        dc_time = dc["Time (sec)"].to_numpy(dtype=float) + (
-            parse_lvm_start_time_seconds(dc_path) - parse_lvm_start_time_seconds(folder / "Temperature.lvm")
-        )
+        dc_time = apply_clock_offset(dc["Time (sec)"].to_numpy(dtype=float), dc_alignment)
         near_zero = (power >= -0.5) & (power <= 0.5)
         start_idx = np.where(~near_zero)[0][0]
         off_candidates = np.where(near_zero & (dc_time > dc_time[start_idx]))[0]
@@ -2023,6 +2269,7 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
             dnb_time_s=dnb_time_s,
             peak_time_s=peak_time_s,
             off_time_s=shut_time,
+            clock_offset_s=float(hydrophone_alignment.applied_offset_s or 0.0),
         )
         summary.update(hydrophone_summary)
         hydrophone_band_power_path = output_dir / "hydrophone_band_integrated_power.csv"
@@ -2045,7 +2292,9 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
                     off_time_s=shut_time,
                 )
             )
-        summary.update(save_ae_analysis(folder, plots_dir))
+        summary.update(
+            save_ae_analysis(folder, plots_dir, clock_offset_s=float(ae_alignment.applied_offset_s or 0.0))
+        )
         if args.include_wfs:
             summary.update(
                 save_wfs_ae_spectrogram(
@@ -2063,11 +2312,32 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
                     dnb_time_s=dnb_time_s,
                     peak_time_s=peak_time_s,
                     off_time_s=shut_time,
+                    clock_offset_s=float(wfs_alignment.applied_offset_s or 0.0),
                 )
             )
         if args.include_wfs:
             validate_required_single_case_figures(plots_dir)
 
+    write_derived_data_exports(
+        output_dir,
+        temp_data=temp_data,
+        heat_transfer_coefficient=htc,
+        saturation_temperature_c=t_sat_c,
+        pressure_time_s=pressure_df["Time (sec)"].to_numpy(dtype=float),
+        pressure_kpa=pressure,
+        dc_time_s=dc_time,
+        dc_power_w=power,
+        summary=summary,
+        alignments=alignments,
+    )
+    summary.update(
+        {
+            "thermal_timeseries_csv": str(output_dir / "thermal_timeseries.csv"),
+            "thermal_timeseries_npz": str(output_dir / "thermal_timeseries.npz"),
+            "critical_events_csv": str(output_dir / "critical_events.csv"),
+            "time_alignment_json": str(output_dir / "time_alignment.json"),
+        }
+    )
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     write_summary_markdown(output_dir / "summary.md", summary)
     return summary
@@ -2090,7 +2360,7 @@ def write_summary_markdown(path: Path, summary: dict[str, object]) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test-id", default="Boiling-417")
-    parser.add_argument("--raw-root", default=r"Y:\0_Ishraq\New Pool Boiling Video")
+    parser.add_argument("--raw-root", default=r"X:\0_Ishraq\New Pool Boiling Video")
     parser.add_argument(
         "--output-dir",
         default=None,
@@ -2098,7 +2368,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--subcooling", type=float, default=57.6)
     parser.add_argument("--applied-heat-load", type=float, default=250.0)
-    parser.add_argument("--target-pressure", type=float, default=97.7)
+    parser.add_argument(
+        "--target-pressure",
+        "--target-pressure-kpa",
+        dest="target_pressure",
+        type=float,
+        default=97.7,
+        help="User-supplied target pressure in kPa; used for the pressure-control comparison.",
+    )
+    parser.add_argument(
+        "--analysis-mode",
+        choices=("subcooled", "transient"),
+        default="subcooled",
+        help="Case context recorded in output metadata; it does not change the thermal reduction equations.",
+    )
+    parser.add_argument(
+        "--clock-offset-tolerance-s",
+        type=float,
+        default=1e-3,
+        help="Recorded clock offsets at or below this magnitude are set to zero; default: 1 ms.",
+    )
+    parser.add_argument(
+        "--chf-event-status",
+        choices=("not_confirmed", "confirmed_by_user"),
+        default="not_confirmed",
+        help="Evidence status for the fixed-window CHF proxy; a computed maximum is not automatically confirmed CHF.",
+    )
     parser.add_argument("--chf-marker-start-s", type=float, default=50.0)
     parser.add_argument("--chf-marker-end-s", type=float, default=100.0)
     parser.add_argument("--nbr-gap-s", type=float, default=200.0)
