@@ -120,6 +120,12 @@ def resolve_case_file(folder: Path, canonical_filename: str) -> Path:
     aliases = [canonical_filename]
     if canonical_filename.casefold() == "hydrophones.lvm":
         aliases.append("Hydrophone.lvm")
+    elif canonical_filename.casefold() == "ae_hit.txt":
+        # Older USB AE Node exports omit the underscore in ``AEHit.TXT``.
+        aliases.append("AEHit.TXT")
+    elif canonical_filename.casefold() == "ae_source.dta":
+        # Preserve compatibility with both EasyAE and legacy USB naming.
+        aliases.append("AESource.DTA")
     exact_paths = [folder / alias for alias in aliases]
     for exact_path in exact_paths:
         if exact_path.exists():

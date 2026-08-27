@@ -73,6 +73,13 @@ def test_resolve_case_file_accepts_singular_hydrophone_alias(tmp_path: Path):
     assert resolve_case_file(tmp_path, "Hydrophones.lvm") == singular
 
 
+def test_resolve_case_file_accepts_legacy_ae_hit_alias(tmp_path: Path):
+    legacy = tmp_path / "BoilingBench-4_AEHit.TXT"
+    legacy.touch()
+
+    assert resolve_case_file(tmp_path, "AE_Hit.TXT") == legacy
+
+
 def test_normalize_test_id_preserves_documented_boilingbench_identifier():
     assert normalize_test_id("BoilingBench-1") == "BoilingBench-1"
 
