@@ -163,6 +163,20 @@ use a unique dataset prefix (for example, `BoilingBench-1_Temperature.lvm`),
 use `--case-folder <raw-directory>`. The runner resolves the uniquely prefixed
 versions of the standard modality filenames without renaming the raw files.
 
+To persist a decoded waveform for reuse, run
+`scripts\cache_decoded_wfs.py --raw-dir <raw-directory> --processed-dir
+<processed-directory> --channel 1`. This writes a lossless, memory-mappable
+NumPy waveform and JSON acquisition metadata. Use `np.load(..., mmap_mode="r")`
+for later feature extraction without decoding the raw stream again.
+
+To create a case-level hysteresis report from a processed run, use
+`scripts\run_case_hysteresis_analysis.py --processed-dir <processed-directory>`.
+The command writes `hysteresis_summary.csv`, `hysteresis_analysis.xlsx`,
+`hysteresis_timeseries.csv`, and two plots. Its `q_NBR/q_CHF` value is labeled a
+screening proxy when the upstream CHF marker is not independently confirmed.
+MEB-specific outputs are appropriate for subcooled cases such as BoilingBench-1;
+they are not generated for saturated BoilingBench-2.
+
 The default run decodes the continuous acoustic-emission waveform from a `.wfs`
 stream file with `decode-wfs`, uses channel 1 by default, and writes the AE
 spectrogram, band-integrated power trace, and characteristic-frequency trace.
