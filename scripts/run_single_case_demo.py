@@ -65,7 +65,7 @@ REQUIRED_SINGLE_CASE_FIGURES = (
 
 
 def normalize_test_id(test_id: str) -> str:
-    return test_id if test_id.startswith("Boiling-") else f"Boiling-{test_id}"
+    return test_id if test_id.casefold().startswith("boiling") else f"Boiling-{test_id}"
 
 
 def default_output_dir(test_id: str) -> Path:
@@ -115,8 +115,22 @@ def save_unavailable_plots(plots_dir: Path, plots: dict[str, tuple[str, str]]) -
         save_unavailable_plot(plots_dir / filename, title, message)
 
 
+def resolve_case_file(folder: Path, canonical_filename: str) -> Path:
+    """Resolve a canonical acquisition file or one with a unique dataset prefix."""
+    exact_path = folder / canonical_filename
+    if exact_path.exists():
+        return exact_path
+    suffix = f"_{canonical_filename}".lower()
+    matches = sorted(path for path in folder.iterdir() if path.is_file() and path.name.lower().endswith(suffix))
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise FileNotFoundError(f"Could not find {canonical_filename} or a uniquely prefixed equivalent in {folder}")
+    raise ValueError(f"Ambiguous prefixed matches for {canonical_filename} in {folder}: {matches}")
+
+
 def read_lvm(folder: Path, filename: str) -> pd.DataFrame:
-    return pd.read_csv(folder / filename, skiprows=LVM_SKIP_ROWS, sep="\t")
+    return pd.read_csv(resolve_case_file(folder, filename), skiprows=LVM_SKIP_ROWS, sep="\t")
 
 
 def find_ae_dta_file(folder: Path) -> Path | None:
@@ -1468,8 +1482,9 @@ def save_hydrophone_analysis(
     off_time_s: float | None = None,
     clock_offset_s: float = 0.0,
 ) -> dict[str, object]:
-    path = folder / "Hydrophones.lvm"
-    if not path.exists():
+    try:
+        path = resolve_case_file(folder, "Hydrophones.lvm")
+    except FileNotFoundError:
         save_unavailable_plots(
             plots_dir,
             {
@@ -1714,13 +1729,21 @@ def read_ae_time(path: Path) -> pd.DataFrame:
 
 
 def save_ae_analysis(folder: Path, plots_dir: Path, clock_offset_s: float = 0.0) -> dict[str, object]:
+    try:
+        ae_hit_path = resolve_case_file(folder, "AE_Hit.TXT")
+    except FileNotFoundError:
+        ae_hit_path = None
+    try:
+        ae_time_path = resolve_case_file(folder, "AE_Time.TXT")
+    except FileNotFoundError:
+        ae_time_path = None
     summary: dict[str, object] = {
-        "ae_hit_available": (folder / "AE_Hit.TXT").exists(),
-        "ae_time_available": (folder / "AE_Time.TXT").exists(),
+        "ae_hit_available": ae_hit_path is not None,
+        "ae_time_available": ae_time_path is not None,
     }
 
     if summary["ae_hit_available"]:
-        ae_hit = read_ae_hit(folder / "AE_Hit.TXT")
+        ae_hit = read_ae_hit(ae_hit_path)
         ae_hit["AE_Hit_Time"] = ae_hit["AE_Hit_Time"] + clock_offset_s
         plot_columns = [
             "PARA1",
@@ -1756,7 +1779,7 @@ def save_ae_analysis(folder: Path, plots_dir: Path, clock_offset_s: float = 0.0)
         summary["ae_hit_rows"] = int(len(ae_hit))
 
     if summary["ae_time_available"]:
-        ae_time = read_ae_time(folder / "AE_Time.TXT")
+        ae_time = read_ae_time(ae_time_path)
         ae_time = ae_time.dropna(subset=["AE_Time", "PARA1", "RMS", "ABS-ENERGY", "ASL"])
         ae_time["AE_Time"] = ae_time["AE_Time"] + clock_offset_s
         fig, axes = plt.subplots(2, 2, figsize=(14, 10), sharex=True)
@@ -2014,14 +2037,14 @@ def save_wfs_ae_spectrogram(
 
 def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     test_id = normalize_test_id(args.test_id)
-    folder = Path(args.raw_root) / test_id
+    folder = Path(args.case_folder) if args.case_folder else Path(args.raw_root) / test_id
     output_dir = Path(args.output_dir) if args.output_dir else default_output_dir(test_id)
     plots_dir = output_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
-    temperature_path = folder / "Temperature.lvm"
-    pressure_path = folder / "Pressure.lvm"
-    dc_path = folder / "DC_power.lvm"
+    temperature_path = resolve_case_file(folder, "Temperature.lvm")
+    pressure_path = resolve_case_file(folder, "Pressure.lvm")
+    dc_path = resolve_case_file(folder, "DC_power.lvm")
     temperature_clock = parse_lvm_start_datetime(temperature_path)
     temperature_alignment = make_clock_alignment(
         "temperature",
@@ -2040,7 +2063,7 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     )
     hydrophone_alignment = lvm_clock_alignment(
         "hydrophone",
-        folder / "Hydrophones.lvm",
+        resolve_case_file(folder, "Hydrophones.lvm"),
         temperature_path,
         temperature_clock,
         args.clock_offset_tolerance_s,
@@ -2361,6 +2384,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test-id", default="Boiling-417")
     parser.add_argument("--raw-root", default=r"X:\0_Ishraq\New Pool Boiling Video")
+    parser.add_argument(
+        "--case-folder",
+        default=None,
+        help="Explicit raw case directory, for cases not nested below <raw-root>/<test-id>.",
+    )
     parser.add_argument(
         "--output-dir",
         default=None,

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
+from scripts.run_single_case_demo import normalize_test_id, resolve_case_file
 from scripts.time_alignment import (
     apply_clock_offset,
     make_clock_alignment,
@@ -55,3 +56,14 @@ def test_easy_ae_clock_is_found_inside_a_binary_prefixed_line(tmp_path: Path):
     dta.write_bytes(b"header\n\x1a\x00clock: Sun May 10 18:02:12 2026\n")
 
     assert parse_easy_ae_start_datetime(dta) == datetime(2026, 5, 10, 18, 2, 12)
+
+
+def test_resolve_case_file_accepts_unique_documentation_prefix(tmp_path: Path):
+    prefixed = tmp_path / "BoilingBench-1_Temperature.lvm"
+    prefixed.touch()
+
+    assert resolve_case_file(tmp_path, "Temperature.lvm") == prefixed
+
+
+def test_normalize_test_id_preserves_documented_boilingbench_identifier():
+    assert normalize_test_id("BoilingBench-1") == "BoilingBench-1"
