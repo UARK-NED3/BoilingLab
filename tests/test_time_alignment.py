@@ -2,8 +2,9 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
-from scripts.run_single_case_demo import normalize_test_id, resolve_case_file
+from scripts.run_single_case_demo import normalize_test_id, resolve_case_file, standardize_temperature_columns
 from scripts.time_alignment import (
     apply_clock_offset,
     make_clock_alignment,
@@ -65,5 +66,20 @@ def test_resolve_case_file_accepts_unique_documentation_prefix(tmp_path: Path):
     assert resolve_case_file(tmp_path, "Temperature.lvm") == prefixed
 
 
+def test_resolve_case_file_accepts_singular_hydrophone_alias(tmp_path: Path):
+    singular = tmp_path / "BoilingBench-3_Hydrophone.lvm"
+    singular.touch()
+
+    assert resolve_case_file(tmp_path, "Hydrophones.lvm") == singular
+
+
 def test_normalize_test_id_preserves_documented_boilingbench_identifier():
     assert normalize_test_id("BoilingBench-1") == "BoilingBench-1"
+
+
+def test_standardize_temperature_columns_maps_generic_six_channel_export():
+    frame = pd.DataFrame(columns=["Time (sec)", *(f"Temperature_{i}" for i in range(6))])
+    standardized = standardize_temperature_columns(frame)
+    assert list(standardized.columns[1:]) == [
+        "Thermo-couple_1", "Thermo-couple_2", "Thermo-couple_3", "Thermo-couple_4", "Vapour Temp", "Liquid Temp"
+    ]

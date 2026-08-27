@@ -142,6 +142,24 @@ available. See [multimodal time alignment](docs/multimodal-time-alignment.md)
 for the equation, tolerance, and limits. The default `chf_proxy` event is not a
 confirmed CHF event unless the analyst explicitly records that status.
 
+## BoilingBench-3 legacy-DAQ case
+
+BoilingBench-3 uses a generic six-channel temperature export, a singular
+`Hydrophone.lvm` filename, a separate `Microphone.lvm`, and legacy MISTRAS USB
+AE data without a continuous `.wfs` stream. Run it with:
+
+```powershell
+python scripts\run_single_case_demo.py --test-id BoilingBench-3 --case-folder <raw-directory> --analysis-mode saturated --target-pressure-kpa 101.325 --subcooling 0 --applied-heat-load 0 --skip-wfs
+```
+
+The default four-probe geometry is 0, 2.54, 5.08, and 7.62 mm with the heated
+surface at 13.1826 mm; verify those positions against the case calibration
+before using the reconstructed heat flux quantitatively. Because this legacy
+case has no pressure or DC-power file, the command records atmospheric pressure
+as a user-supplied fallback and does not invent a power or shutoff trace.
+Hydrophone and microphone analyses are retained as separate synchronized
+outputs; continuous AE waveform spectrograms are unavailable for this case.
+
 ## Reproduce the Boiling-424 Transient Thermal Reduction
 
 The transient notebook corresponds to the 9.98 kPa / 60 W case currently
