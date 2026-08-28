@@ -117,11 +117,23 @@ def save_unavailable_plots(plots_dir: Path, plots: dict[str, tuple[str, str]]) -
 
 def resolve_case_file(folder: Path, canonical_filename: str) -> Path:
     """Resolve a canonical acquisition file or one with a unique dataset prefix."""
-    exact_path = folder / canonical_filename
-    if exact_path.exists():
-        return exact_path
-    suffix = f"_{canonical_filename}".lower()
-    matches = sorted(path for path in folder.iterdir() if path.is_file() and path.name.lower().endswith(suffix))
+    aliases = [canonical_filename]
+    if canonical_filename.casefold() == "hydrophones.lvm":
+        aliases.append("Hydrophone.lvm")
+    elif canonical_filename.casefold() == "ae_hit.txt":
+        # Older USB AE Node exports omit the underscore in ``AEHit.TXT``.
+        aliases.append("AEHit.TXT")
+    elif canonical_filename.casefold() == "ae_source.dta":
+        # Preserve compatibility with both EasyAE and legacy USB naming.
+        aliases.append("AESource.DTA")
+    exact_paths = [folder / alias for alias in aliases]
+    for exact_path in exact_paths:
+        if exact_path.exists():
+            return exact_path
+    suffixes = tuple(f"_{alias}".lower() for alias in aliases)
+    matches = sorted(
+        path for path in folder.iterdir() if path.is_file() and path.name.lower().endswith(suffixes)
+    )
     if len(matches) == 1:
         return matches[0]
     if not matches:
@@ -133,6 +145,28 @@ def read_lvm(folder: Path, filename: str) -> pd.DataFrame:
     return pd.read_csv(resolve_case_file(folder, filename), skiprows=LVM_SKIP_ROWS, sep="\t")
 
 
+def maybe_resolve_case_file(folder: Path, canonical_filename: str) -> Path | None:
+    try:
+        return resolve_case_file(folder, canonical_filename)
+    except FileNotFoundError:
+        return None
+
+
+def standardize_temperature_columns(temp: pd.DataFrame) -> pd.DataFrame:
+    """Map LabVIEW generic Temperature_0..5 channels to the BoilingLab schema."""
+    if all(f"Thermo-couple_{i}" in temp.columns for i in range(1, 5)):
+        return temp
+    generic = sorted(
+        (column for column in temp.columns if re.fullmatch(r"Temperature_\d+", str(column))),
+        key=lambda column: int(str(column).split("_")[-1]),
+    )
+    if len(generic) < 6:
+        raise ValueError("Temperature data need four thermocouples plus vapor and liquid channels.")
+    mapping = {generic[i]: f"Thermo-couple_{i + 1}" for i in range(4)}
+    mapping.update({generic[4]: "Vapour Temp", generic[5]: "Liquid Temp"})
+    return temp.rename(columns=mapping)
+
+
 def find_ae_dta_file(folder: Path) -> Path | None:
     candidates = sorted(folder.glob("*.DTA")) + sorted(folder.glob("*.dta"))
     return candidates[0] if candidates else None
@@ -140,13 +174,13 @@ def find_ae_dta_file(folder: Path) -> Path | None:
 
 def lvm_clock_alignment(
     modality: str,
-    source_path: Path,
+    source_path: Path | None,
     temperature_path: Path,
     temperature_clock,
     tolerance_s: float,
 ) -> ClockAlignmentRecord:
     """Return a recorded-clock alignment, retaining unavailable/parse states."""
-    if not source_path.exists():
+    if source_path is None or not source_path.exists():
         return unavailable_alignment(
             modality,
             temperature_path,
@@ -396,7 +430,11 @@ def detect_wall_temperature_peak_time(
     return first_max_index(surface_temperature, candidates, time_s)
 
 
-def compute_temperature_quantities(temp: pd.DataFrame) -> dict[str, np.ndarray]:
+def compute_temperature_quantities(
+    temp: pd.DataFrame,
+    tc_location_m: np.ndarray = TC_LOCATION_M,
+    surface_location_m: float = SURFACE_LOCATION_FLAT_CU_M,
+) -> dict[str, np.ndarray]:
     time_s = temp["Time (sec)"].to_numpy(dtype=float)
     thermocouples = np.column_stack(
         [
@@ -407,18 +445,21 @@ def compute_temperature_quantities(temp: pd.DataFrame) -> dict[str, np.ndarray]:
         ]
     )
 
-    n_tc = len(TC_LOCATION_M)
-    slope_denominator = n_tc * np.sum(TC_LOCATION_M**2) - np.sum(TC_LOCATION_M) ** 2
+    tc_location_m = np.asarray(tc_location_m, dtype=float)
+    n_tc = len(tc_location_m)
+    if n_tc != thermocouples.shape[1] or n_tc < 2:
+        raise ValueError("The number of thermocouple locations must match at least two temperature channels.")
+    slope_denominator = n_tc * np.sum(tc_location_m**2) - np.sum(tc_location_m) ** 2
     slope_numerator = (
-        n_tc * np.sum(thermocouples * TC_LOCATION_M, axis=1)
-        - np.sum(TC_LOCATION_M) * np.sum(thermocouples, axis=1)
+        n_tc * np.sum(thermocouples * tc_location_m, axis=1)
+        - np.sum(tc_location_m) * np.sum(thermocouples, axis=1)
     )
     slope = slope_numerator / slope_denominator
-    intercept = (np.sum(thermocouples, axis=1) - slope * np.sum(TC_LOCATION_M)) / n_tc
+    intercept = (np.sum(thermocouples, axis=1) - slope * np.sum(tc_location_m)) / n_tc
     heat_flux = -CU_THERMAL_CONDUCTIVITY_W_MK * slope / 1e4
-    surface_temperature = slope * SURFACE_LOCATION_FLAT_CU_M + intercept
+    surface_temperature = slope * surface_location_m + intercept
 
-    predicted = slope[:, None] * TC_LOCATION_M + intercept[:, None]
+    predicted = slope[:, None] * tc_location_m + intercept[:, None]
     measured_mean = np.mean(thermocouples, axis=1, keepdims=True)
     r2 = 1 - np.sum((thermocouples - predicted) ** 2, axis=1) / np.sum(
         (thermocouples - measured_mean) ** 2, axis=1
@@ -1481,28 +1522,31 @@ def save_hydrophone_analysis(
     peak_time_s: float | None = None,
     off_time_s: float | None = None,
     clock_offset_s: float = 0.0,
+    source_filename: str = "Hydrophones.lvm",
+    output_prefix: str = "hydrophone",
+    signal_label: str = "Hydrophone",
 ) -> dict[str, object]:
     try:
-        path = resolve_case_file(folder, "Hydrophones.lvm")
+        path = resolve_case_file(folder, source_filename)
     except FileNotFoundError:
         save_unavailable_plots(
             plots_dir,
             {
-                "hydrophone_spectrogram.png": (
-                    "Hydrophone spectrogram unavailable",
-                    "Hydrophones.lvm was not found for this test.",
+                f"{output_prefix}_spectrogram.png": (
+                    f"{signal_label} spectrogram unavailable",
+                    f"{source_filename} was not found for this test.",
                 ),
-                "hydrophone_band_integrated_power.png": (
-                    "Hydrophone band-integrated power unavailable",
-                    "Hydrophones.lvm was not found for this test.",
+                f"{output_prefix}_band_integrated_power.png": (
+                    f"{signal_label} band-integrated power unavailable",
+                    f"{source_filename} was not found for this test.",
                 ),
-                "hydrophone_characteristic_frequencies.png": (
-                    "Hydrophone characteristic frequencies unavailable",
-                    "Hydrophones.lvm was not found for this test.",
+                f"{output_prefix}_characteristic_frequencies.png": (
+                    f"{signal_label} characteristic frequencies unavailable",
+                    f"{source_filename} was not found for this test.",
                 ),
             },
         )
-        return {"hydrophone_available": False}
+        return {f"{output_prefix}_available": False}
 
     hydrophones = pd.read_csv(
         path,
@@ -1524,7 +1568,7 @@ def save_hydrophone_analysis(
     ax.grid(True, linestyle="--", alpha=0.4)
     ax.tick_params(axis="both", labelsize=13, direction="in", top=True, right=True)
     fig.tight_layout()
-    fig.savefig(plots_dir / "hydrophone_raw.png", dpi=180)
+    fig.savefig(plots_dir / f"{output_prefix}_raw.png", dpi=180)
     plt.close(fig)
 
     hydro_time = hydrophones["Time"].to_numpy(dtype=float)
@@ -1566,7 +1610,7 @@ def save_hydrophone_analysis(
     ax.tick_params(axis="both", which="major", labelsize=20)
     for label in ax.get_xticklabels() + ax.get_yticklabels() + colorbar.ax.get_yticklabels():
         label.set_fontname("Arial")
-    fig.savefig(plots_dir / "hydrophone_spectrogram.png", dpi=180)
+    fig.savefig(plots_dir / f"{output_prefix}_spectrogram.png", dpi=180)
     plt.close(fig)
 
     psd_frequencies, psd_times, psd = spectrogram(
@@ -1588,11 +1632,11 @@ def save_hydrophone_analysis(
     band_power_df = pd.DataFrame(
         {
             "Time (s)": psd_times,
-            "Band-integrated hydrophone power proxy (V^2)": band_integrated_power,
-            "Band-integrated hydrophone power proxy (dB re V^2)": band_integrated_power_db,
+            f"Band-integrated {signal_label.lower()} power proxy (V^2)": band_integrated_power,
+            f"Band-integrated {signal_label.lower()} power proxy (dB re V^2)": band_integrated_power_db,
         }
     )
-    band_power_df.to_csv(plots_dir.parent / "hydrophone_band_integrated_power.csv", index=False)
+    band_power_df.to_csv(plots_dir.parent / f"{output_prefix}_band_integrated_power.csv", index=False)
 
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(psd_times, band_integrated_power_db, color="tab:blue", linewidth=1.8)
@@ -1605,24 +1649,24 @@ def save_hydrophone_analysis(
     for label in ax.get_xticklabels() + ax.get_yticklabels():
         label.set_fontname("Arial")
     fig.subplots_adjust(left=0.16, bottom=0.18, right=0.98, top=0.95)
-    fig.savefig(plots_dir / "hydrophone_band_integrated_power.png", dpi=180)
+    fig.savefig(plots_dir / f"{output_prefix}_band_integrated_power.png", dpi=180)
     plt.close(fig)
 
     summary = {
-        "hydrophone_available": True,
-        "hydrophone_rows": int(len(hydrophones)),
-        "hydrophone_sampling_frequency_Hz": float(sampling_frequency),
-        "hydrophone_clock_offset_s": float(clock_offset_s),
-        "hydrophone_band_min_Hz": float(band_min_hz),
-        "hydrophone_band_max_Hz": float(band_max_hz),
-        "hydrophone_band_power_time_bins": int(len(psd_times)),
-        "hydrophone_band_power_min_V2": float(np.nanmin(band_integrated_power)),
-        "hydrophone_band_power_max_V2": float(np.nanmax(band_integrated_power)),
-        "hydrophone_band_power_mean_V2": float(np.nanmean(band_integrated_power)),
+        f"{output_prefix}_available": True,
+        f"{output_prefix}_rows": int(len(hydrophones)),
+        f"{output_prefix}_sampling_frequency_Hz": float(sampling_frequency),
+        f"{output_prefix}_clock_offset_s": float(clock_offset_s),
+        f"{output_prefix}_band_min_Hz": float(band_min_hz),
+        f"{output_prefix}_band_max_Hz": float(band_max_hz),
+        f"{output_prefix}_band_power_time_bins": int(len(psd_times)),
+        f"{output_prefix}_band_power_min_V2": float(np.nanmin(band_integrated_power)),
+        f"{output_prefix}_band_power_max_V2": float(np.nanmax(band_integrated_power)),
+        f"{output_prefix}_band_power_mean_V2": float(np.nanmean(band_integrated_power)),
     }
     summary.update(
         save_characteristic_frequency_analysis(
-            "hydrophone",
+            output_prefix,
             psd_times,
             psd_frequencies,
             psd,
@@ -1644,7 +1688,7 @@ def save_hydrophone_analysis(
     )
     summary.update(
         save_power_centroid_overlay(
-            "hydrophone",
+            output_prefix,
             psd_times,
             band_integrated_power_db,
             hydrophone_centroid_frequency,
@@ -1659,7 +1703,7 @@ def save_hydrophone_analysis(
     summary.update(
         save_band_power_oscillation_analysis(
             "hydrophone",
-            "Hydrophone",
+            signal_label,
             psd_times,
             band_integrated_power_db,
             plots_dir.parent,
@@ -2043,8 +2087,10 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     plots_dir.mkdir(parents=True, exist_ok=True)
 
     temperature_path = resolve_case_file(folder, "Temperature.lvm")
-    pressure_path = resolve_case_file(folder, "Pressure.lvm")
-    dc_path = resolve_case_file(folder, "DC_power.lvm")
+    pressure_path = maybe_resolve_case_file(folder, "Pressure.lvm")
+    dc_path = maybe_resolve_case_file(folder, "DC_power.lvm")
+    if pressure_path is None:
+        pressure_path = folder / "Pressure.lvm"
     temperature_clock = parse_lvm_start_datetime(temperature_path)
     temperature_alignment = make_clock_alignment(
         "temperature",
@@ -2063,10 +2109,14 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
     )
     hydrophone_alignment = lvm_clock_alignment(
         "hydrophone",
-        resolve_case_file(folder, "Hydrophones.lvm"),
+        maybe_resolve_case_file(folder, "Hydrophones.lvm"),
         temperature_path,
         temperature_clock,
         args.clock_offset_tolerance_s,
+    )
+    microphone_path = maybe_resolve_case_file(folder, "Microphone.lvm")
+    microphone_alignment = lvm_clock_alignment(
+        "microphone", microphone_path, temperature_path, temperature_clock, args.clock_offset_tolerance_s
     )
     ae_alignment = external_clock_alignment(
         "acoustic_emission_parameters",
@@ -2091,19 +2141,30 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         pressure_alignment,
         dc_alignment,
         hydrophone_alignment,
+        microphone_alignment,
         ae_alignment,
         wfs_alignment,
     ]
 
-    temp = read_lvm(folder, "Temperature.lvm").rename(columns={"X_Value": "Time (sec)"})
-    pressure_df = read_lvm(folder, "Pressure.lvm").rename(
-        columns={"X_Value": "Time (sec)", "Voltage": "Pressure (kPa)"}
-    )
-    pressure_df["Time (sec)"] = apply_clock_offset(
-        pressure_df["Time (sec)"].to_numpy(dtype=float), pressure_alignment
-    )
+    temp = standardize_temperature_columns(read_lvm(folder, "Temperature.lvm").rename(columns={"X_Value": "Time (sec)"}))
+    if pressure_path.exists():
+        pressure_df = read_lvm(folder, "Pressure.lvm").rename(
+            columns={"X_Value": "Time (sec)", "Voltage": "Pressure (kPa)"}
+        )
+        pressure_df["Time (sec)"] = apply_clock_offset(
+            pressure_df["Time (sec)"].to_numpy(dtype=float), pressure_alignment
+        )
+        pressure_data_status = "measured_lvm"
+    else:
+        pressure_df = pd.DataFrame(
+            {"Time (sec)": temp["Time (sec)"].to_numpy(dtype=float), "Pressure (kPa)": args.target_pressure}
+        )
+        pressure_data_status = "user_supplied_constant_fallback"
 
-    temp_data = compute_temperature_quantities(temp)
+    tc_location_m = np.asarray(args.tc_locations_mm, dtype=float) * 1e-3
+    temp_data = compute_temperature_quantities(
+        temp, tc_location_m=tc_location_m, surface_location_m=float(args.surface_location_mm) * 1e-3
+    )
     time_s = temp_data["time_s"]
     heat_flux = temp_data["heat_flux"]
     surface_temperature = temp_data["surface_temperature"]
@@ -2145,6 +2206,10 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         "analysis_mode": args.analysis_mode,
         "temperature_reference_clock": temperature_clock.isoformat(),
         "clock_offset_tolerance_s": float(args.clock_offset_tolerance_s),
+        "thermocouple_locations_mm": [float(value) for value in args.tc_locations_mm],
+        "surface_location_mm": float(args.surface_location_mm),
+        "temperature_channel_mapping": "Temperature_0..3 -> block thermocouples; Temperature_4 -> vapor; Temperature_5 -> liquid when generic LabVIEW names are present",
+        "pressure_data_status": pressure_data_status,
         "applied_heat_load_W_cm2": args.applied_heat_load,
         "input_subcooling_C": args.subcooling,
         "duration_s": float(np.nanmax(time_s) - np.nanmin(time_s)),
@@ -2177,13 +2242,14 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
         "q_min_time_s": float(time_s[q_min_idx]),
         "mean_R2_linear_fit": float(np.nanmean(r2)),
         "min_R2_linear_fit": float(np.nanmin(r2)),
+        "ae_waveform_processing": "not_available_legacy_mistras_usb_node" if not find_wfs_file(folder) else "available_easy_ae_or_compatible_wfs",
         "plots_dir": str(plots_dir),
     }
 
     dc_time = None
     power = None
     shut_time = None
-    if dc_path.exists():
+    if dc_path is not None and dc_path.exists():
         dc = read_lvm(folder, "DC_power.lvm")
         dc = dc.rename(
             columns={
@@ -2294,12 +2360,34 @@ def analyze_case(args: argparse.Namespace) -> dict[str, object]:
             off_time_s=shut_time,
             clock_offset_s=float(hydrophone_alignment.applied_offset_s or 0.0),
         )
+        summary.update(
+            save_hydrophone_analysis(
+                folder,
+                plots_dir,
+                band_min_hz=args.hydrophone_band_min_hz,
+                band_max_hz=args.hydrophone_band_max_hz,
+                oscillation_start_s=args.oscillation_start_s,
+                oscillation_end_s=args.oscillation_end_s,
+                oscillation_max_frequency_hz=args.oscillation_max_frequency_hz,
+                dnb_time_s=dnb_time_s,
+                peak_time_s=peak_time_s,
+                off_time_s=shut_time,
+                clock_offset_s=float(microphone_alignment.applied_offset_s or 0.0),
+                source_filename="Microphone.lvm",
+                output_prefix="microphone",
+                signal_label="Microphone",
+            )
+        )
         summary.update(hydrophone_summary)
         hydrophone_band_power_path = output_dir / "hydrophone_band_integrated_power.csv"
         hydrophone_band_power = None
         if hydrophone_band_power_path.exists():
             hydrophone_band_power = pd.read_csv(hydrophone_band_power_path)
-        if hydrophone_band_power is not None and "Band-integrated hydrophone power proxy (V^2)" in hydrophone_band_power:
+        if (
+            args.analysis_mode == "subcooled"
+            and hydrophone_band_power is not None
+            and "Band-integrated hydrophone power proxy (V^2)" in hydrophone_band_power
+        ):
             summary.update(
                 save_meb_envelope_analysis(
                     test_id,
@@ -2397,6 +2485,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--subcooling", type=float, default=57.6)
     parser.add_argument("--applied-heat-load", type=float, default=250.0)
     parser.add_argument(
+        "--tc-locations-mm", nargs=4, type=float, default=[0.0, 2.54, 5.08, 7.62], metavar=("TC1", "TC2", "TC3", "TC4"),
+        help="Four thermocouple depths in mm, ordered from the block reference plane.",
+    )
+    parser.add_argument(
+        "--surface-location-mm", type=float, default=13.1826,
+        help="Heated-surface depth relative to the first thermocouple, in mm.",
+    )
+    parser.add_argument(
         "--target-pressure",
         "--target-pressure-kpa",
         dest="target_pressure",
@@ -2406,7 +2502,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--analysis-mode",
-        choices=("subcooled", "transient"),
+        choices=("subcooled", "transient", "saturated"),
         default="subcooled",
         help="Case context recorded in output metadata; it does not change the thermal reduction equations.",
     )
