@@ -2,6 +2,9 @@
 
 BoilingLab is a research toolkit for pool-boiling experimental protocols, multimodal data synchronization, thermal reconstruction, acoustic analysis, hysteresis analysis, and machine-readable export. It is the processing layer in the NED³ thermal-AI ecosystem.
 
+Repository scope, evidence, and reuse boundaries are also available in the
+[NED3 resource manifest](.ned3/resource-manifest-v0.1.json).
+
 The repository works with user-supplied data and does not assume a drive letter or machine-specific folder layout.
 
 ## Public benchmark examples
