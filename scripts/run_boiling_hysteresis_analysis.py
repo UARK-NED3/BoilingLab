@@ -3,11 +3,11 @@
 This runner reproduces the analysis used for the boiling-hysteresis manuscript:
 
 * pressure and surface trends in CHF/HTC and hysteresis,
-* stretched-exponential thermal-maturity fits,
+* stretched-exponential post-CHF thermal-history fits,
 * NBR wall-superheat diagnostics,
 * Rohsenow sensitivity for q''_NBR(T_NBR),
 * flat-surface minimum-film-boiling regime checks,
-* held-out 10 kPa post-CHF protocol tests, and
+* excluded 10 kPa post-CHF protocol transfer tests, and
 * BubbleID side-view vapor-fraction summaries.
 
 The script intentionally reads the organized spreadsheet rather than raw LVM
@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -41,8 +42,9 @@ except ImportError as exc:  # pragma: no cover - exercised by user environment
     ) from exc
 
 
-DEFAULT_DATA = Path(
-    r"C:\Users\hanhu\Box\NED3_Share\Abrar Hoq Fahim\BubbleID-FineTuning\MS Thesis Data_30cases_abrar.xlsx"
+DEFAULT_DATA_CANDIDATES = (
+    Path(r"C:\Users\hanhu\Box\NED3_Share\Abrar Hoq Fahim\BubbleID-FineTuning\MS Thesis Data_30cases_abrar.xlsx"),
+    Path(r"C:\Users\hanhu\Box\NED3_Share\Zulkar Nain Prince\MS Thesis Data_30cases.xlsx"),
 )
 DEFAULT_SHEET = "MS Thesis"
 G = 9.80665
@@ -62,6 +64,19 @@ class FitResult:
     m: float
     r2: float
     rmse: float
+
+
+def default_data_path() -> Path | None:
+    """Resolve a local input only when the user has supplied or mounted one.
+
+    The spreadsheets are released separately from the repository.  A portable
+    clone must therefore use ``--data`` or ``BOILINGLAB_HYSTERESIS_DATA``;
+    the workstation paths remain a convenience for the original analysis host.
+    """
+    supplied = os.environ.get("BOILINGLAB_HYSTERESIS_DATA")
+    if supplied:
+        return Path(supplied).expanduser()
+    return next((path for path in DEFAULT_DATA_CANDIDATES if path.is_file()), None)
 
 
 def set_style() -> None:
@@ -188,6 +203,66 @@ def load_protocol_validation(path: Path, sheet_name: str) -> pd.DataFrame:
     data = data[data["test_id"].str.extract(r"(\d+)$", expand=False).isin(["420", "421", "422", "423", "424"])].copy()
     if len(data) != 5:
         raise ValueError(f"Expected protocol cases Boiling-420--424; found {len(data)} rows in {path}")
+    targets = {
+        "Boiling-420": np.nan,
+        "Boiling-421": 100.0,
+        "Boiling-422": 150.0,
+        "Boiling-423": 200.0,
+        "Boiling-424": 250.0,
+    }
+    labels = {
+        "Boiling-420": "baseline",
+        "Boiling-421": "100 °C target",
+        "Boiling-422": "150 °C target",
+        "Boiling-423": "200 °C target",
+        "Boiling-424": "250 °C target",
+    }
+    data["target_Tmax_C"] = data["test_id"].map(targets)
+    data["protocol_label"] = data["test_id"].map(labels)
+    return data.sort_values("T_max_C").reset_index(drop=True)
+
+
+def load_protocol_validation_csv(path: Path) -> pd.DataFrame:
+    """Load a retained, already processed five-case protocol summary CSV.
+
+    This is provided for reproducible regeneration when the original workbook
+    is unavailable but its processed event summary has been released. It does
+    not replace the workbook loader or reconstruct missing raw traces.
+    """
+    data = pd.read_csv(path).copy()
+    required = {
+        "test_id",
+        "pressure_kpa",
+        "surface",
+        "q_chf_W_cm2",
+        "q_nbr_W_cm2",
+        "T_nbr_C",
+        "T_max_C",
+        "T_sat_C",
+    }
+    missing = sorted(required.difference(data.columns))
+    if missing:
+        raise ValueError(f"Protocol summary CSV is missing required columns: {missing}")
+    data["surface"] = data["surface"].map(canonical_surface)
+    for column in required.difference({"test_id", "surface"}):
+        data[column] = pd.to_numeric(data[column], errors="coerce")
+    data["test_id"] = data["test_id"].astype(str)
+    data = data.dropna(subset=list(required.difference({"test_id", "surface"}))).copy()
+    required_ids = {"Boiling-420", "Boiling-421", "Boiling-422", "Boiling-423", "Boiling-424"}
+    found_ids = set(data["test_id"])
+    if found_ids != required_ids:
+        raise ValueError(
+            "Expected processed protocol cases Boiling-420--424; "
+            f"found {sorted(found_ids)} in {path}"
+        )
+    if "H" not in data.columns:
+        data["H"] = data["q_nbr_W_cm2"] / data["q_chf_W_cm2"]
+    if "DeltaT_max_K" not in data.columns:
+        data["DeltaT_max_K"] = data["T_max_C"] - data["T_sat_C"]
+    if "DeltaT_NBR_K" not in data.columns:
+        data["DeltaT_NBR_K"] = data["T_nbr_C"] - data["T_sat_C"]
+    if "post_chf_to_nbr_s" not in data.columns and {"t_chf_s", "t_nbr_s"}.issubset(data.columns):
+        data["post_chf_to_nbr_s"] = data["t_nbr_s"] - data["t_chf_s"]
     targets = {
         "Boiling-420": np.nan,
         "Boiling-421": 100.0,
@@ -652,7 +727,7 @@ def make_plots(
         style_grid(ax1)
         ax1.set_box_aspect(1 / 1.125)
         ax1.legend(framealpha=0.92, loc="lower right", fontsize=8)
-        ax1.text(0.03, 0.97, "(a)", transform=ax1.transAxes, va="top", ha="left", fontsize=9, fontweight="normal")
+        ax1.text(-0.17, 1.03, "(a)", transform=ax1.transAxes, va="bottom", ha="left", fontsize=12, fontweight="normal")
 
         for surface, style in SURFACE_STYLE.items():
             subset = bdf[bdf["surface"] == surface]
@@ -667,19 +742,7 @@ def make_plots(
                 label=style["label"],
                 zorder=10,
             )
-        spearman_r = bdf["nbr_vf_over_chf_vf"].corr(bdf["H"], method="spearman")
-        ax2.text(0.03, 0.97, "(b)", transform=ax2.transAxes, va="top", ha="left", fontsize=9, fontweight="normal", zorder=10)
-        ax2.text(
-            0.04,
-            0.91,
-            f"Spearman r = {spearman_r:.2f}",
-            transform=ax2.transAxes,
-            va="top",
-            ha="left",
-            fontsize=8,
-            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.85, "pad": 2.0},
-            zorder=10,
-        )
+        ax2.text(-0.17, 1.03, "(b)", transform=ax2.transAxes, va="bottom", ha="left", fontsize=12, fontweight="normal", zorder=10)
         ax2.set_xlabel(r"Vapor persistence, $VF_{\mathrm{NBR}}/VF_{\mathrm{CHF}}$", fontsize=12)
         ax2.set_ylabel(r"Boiling hysteresis, $H$", fontsize=12)
         ax2.tick_params(labelsize=11)
@@ -735,6 +798,46 @@ def write_model_diagnostics(
     (output_dir / "analysis_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
 
+def write_event_ledger(data: pd.DataFrame, output_dir: Path, series: str) -> pd.DataFrame:
+    """Write selected CHF/NBR events without implying a re-detection analysis.
+
+    The source workbook records analyst-selected event quantities and times, but
+    does not retain the original CHF/NBR search-window limits for every case.
+    The ledger preserves the event-level provenance available in the released
+    summary rather than manufacturing a common persistence threshold after the
+    fact.
+    """
+    fields = [
+        "test_id",
+        "surface",
+        "pressure_kpa",
+        "heater_power_W",
+        "t_chf_s",
+        "t_nbr_s",
+        "post_chf_to_nbr_s",
+        "q_chf_W_cm2",
+        "q_nbr_W_cm2",
+        "H",
+        "T_sat_C",
+        "T_max_C",
+        "T_nbr_C",
+        "DeltaT_max_K",
+        "DeltaT_NBR_K",
+    ]
+    ledger = data.reindex(columns=fields).copy()
+    ledger.insert(0, "series", series)
+    ledger["event_status"] = "archived_selected_events"
+    ledger["search_window_status"] = "not_retained"
+    ledger["video_adjudication_status"] = "availability_not_retained_in_summary"
+    ledger["event_provenance_note"] = (
+        "CHF/NBR are the selected summary events used in the manuscript; "
+        "original case-specific search-window limits and exclusions were not retained."
+    )
+    ledger = ledger.sort_values(["surface", "pressure_kpa", "test_id"], kind="stable").reset_index(drop=True)
+    ledger.to_csv(output_dir / f"event_ledger_{series}.csv", index=False)
+    return ledger
+
+
 def write_readme(output_dir: Path) -> None:
     text = """# Boiling Hysteresis Analysis Outputs
 
@@ -747,8 +850,10 @@ The runner reads thermal summary quantities, NBR temperature, and optional
 BubbleID side-view vapor-fraction / bubble-count columns.
 
 An optional five-case flat-copper protocol spreadsheet can be supplied with
-`--protocol-data`. Those approximately 10 kPa cases are written separately and
-are not included in the 30-case parameter fits.
+`--protocol-data` or as a retained processed summary with `--protocol-csv`.
+Those approximately 10 kPa cases are written separately, are not included in
+the 30-case parameter fits, and provide a fixed-parameter protocol transfer
+evaluation rather than external validation.
 
 ## Core Models
 
@@ -773,7 +878,7 @@ H = H_min + (1 - H_min) exp[-((T_max - T_sat) / (T_ref - T_sat))^m].
 For submission diagnostics, run
 `scripts/run_boiling_hysteresis_submission_diagnostics.py`. That script fixes
 `H_min = 0` as a parsimonious boundary condition, compares candidate models by
-AICc and held-out validation, tests residual structure, profiles `H_min`, and
+AICc and cross-validation, tests residual structure, profiles `H_min`, and
 generates 2,000 pressure-block bootstrap intervals. It also evaluates the
 locked fits against the optional protocol cases. The preferred model uses
 `(T_max - T_sat)/(T_ref - T_sat)`; it should be treated as a semi-empirical
@@ -783,14 +888,24 @@ The diagnostic
 `theoretical_hmin_diagnostic.csv` compares it against a hydrodynamic
 `q''_MHF / q''_CHF` scale from Berenson/Zuber-type limiting heat fluxes.
 
+## Event provenance
+
+`event_ledger_standard_30_case.csv` and, when supplied,
+`event_ledger_extended_10kpa.csv` identify the selected CHF and NBR event
+times, heat fluxes, temperatures, and CHF-to-NBR intervals used by the
+manuscript. They do not constitute a re-detection workflow: the original
+case-specific search-window limits, exclusion intervals, and video-adjudication
+records were not retained in the organized summary. The ledger marks these
+fields explicitly as not retained rather than assigning a post hoc threshold.
+
 ## Main Figures
 
 - `fig01_chf_htc_vs_pressure`: heating-branch performance summary.
 - `fig02_hysteresis_vs_pressure`: pressure trend in boiling hysteresis.
 - `fig03_hysteresis_constant_scale_fit`: global collapse versus maximum wall
   superheat.
-- `fig04_nbr_wall_superheat_vs_pressure`: NBR wall-superheat band, supporting
-  temperature-controlled rewetting.
+- `fig04_nbr_wall_superheat_vs_pressure`: NBR apparent base-wall-superheat
+  trend across the standard cases.
 - `fig05_qnbr_rohsenow_parity`: sensitivity of q''_NBR(T_NBR) to the
   Rohsenow liquid-surface coefficient (`C_sf = 0.0128` and `0.0107`).
 - `fig06_bubbleid_vapor_fraction_by_stage`: two-panel BubbleID diagnostic
@@ -815,13 +930,27 @@ measurement-uncertainty budget.
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data", type=Path, default=DEFAULT_DATA, help="Organized hysteresis spreadsheet.")
+    parser.add_argument(
+        "--data",
+        type=Path,
+        default=default_data_path(),
+        help=(
+            "Organized hysteresis spreadsheet. Set BOILINGLAB_HYSTERESIS_DATA "
+            "or supply this argument when the released dataset is stored outside the repository."
+        ),
+    )
     parser.add_argument("--sheet", default=DEFAULT_SHEET, help="Worksheet name in the spreadsheet.")
     parser.add_argument(
         "--protocol-data",
         type=Path,
         default=None,
-        help="Optional workbook containing held-out cases Boiling-420--424.",
+        help="Optional workbook containing excluded protocol cases Boiling-420--424.",
+    )
+    parser.add_argument(
+        "--protocol-csv",
+        type=Path,
+        default=None,
+        help="Optional processed CSV containing cases Boiling-420--424 when the source workbook is unavailable.",
     )
     parser.add_argument("--protocol-sheet", default=DEFAULT_SHEET, help="Worksheet for protocol validation data.")
     parser.add_argument(
@@ -835,16 +964,29 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.data is None:
+        raise SystemExit(
+            "No dataset was found. Supply --data PATH or set "
+            "BOILINGLAB_HYSTERESIS_DATA to the released 30-case workbook."
+        )
     set_style()
     output_dir = args.output
     output_dir.mkdir(parents=True, exist_ok=True)
 
     data = load_hysteresis_dataset(args.data, args.sheet)
     data.to_csv(output_dir / "processed_hysteresis_data.csv", index=False)
+    write_event_ledger(data, output_dir, series="standard_30_case")
+    if args.protocol_data is not None and args.protocol_csv is not None:
+        raise SystemExit("Use only one of --protocol-data or --protocol-csv.")
     protocol_data = None
     if args.protocol_data is not None:
         protocol_data = load_protocol_validation(args.protocol_data, args.protocol_sheet)
         protocol_data.to_csv(output_dir / "protocol_validation_data.csv", index=False)
+        write_event_ledger(protocol_data, output_dir, series="extended_10kpa")
+    elif args.protocol_csv is not None:
+        protocol_data = load_protocol_validation_csv(args.protocol_csv)
+        protocol_data.to_csv(output_dir / "protocol_validation_data.csv", index=False)
+        write_event_ledger(protocol_data, output_dir, series="extended_10kpa")
     fit_table, _ = fit_models(data)
     fit_table.to_csv(output_dir / "hysteresis_fit_summary.csv", index=False)
     make_plots(data, fit_table, output_dir, protocol_data=protocol_data)
@@ -854,7 +996,7 @@ def main() -> None:
         output_dir,
         args.data,
         protocol_data=protocol_data,
-        protocol_path=args.protocol_data,
+        protocol_path=args.protocol_data or args.protocol_csv,
     )
     write_readme(output_dir)
     print(f"Wrote hysteresis analysis outputs to {output_dir.resolve()}")

@@ -7,14 +7,16 @@ organized 30-case summary spreadsheet rather than raw `.lvm` files.
 
 The analysis also accepts a separate five-case flat-copper protocol dataset.
 Those approximately 10 kPa tests vary the post-CHF target temperature and are
-kept out of parameter fitting so they can be used as external validation.
+kept out of parameter fitting for a fixed-parameter, within-apparatus transfer
+evaluation. They are not an external validation across facilities or heaters.
 
 ## Dataset
 
-Default local input:
+Original-workstation input candidates:
 
 ```text
 C:\Users\hanhu\Box\NED3_Share\Abrar Hoq Fahim\BubbleID-FineTuning\MS Thesis Data_30cases_abrar.xlsx
+C:\Users\hanhu\Box\NED3_Share\Zulkar Nain Prince\MS Thesis Data_30cases.xlsx
 ```
 
 Worksheet:
@@ -29,6 +31,11 @@ saturation temperature, and NBR wall temperature. Optional BubbleID columns
 (`ONB_vf`, `CHF_vf`, `NBR_vf`, `ONB_count`, `CHF_count`, and `NBR_count`) are
 used when present.
 
+The source spreadsheet is distributed separately from this repository. A
+portable clone should pass `--data` or set `BOILINGLAB_HYSTERESIS_DATA`; the
+runner only chooses a default when one of the original-workstation paths is
+present.
+
 ## Reproduce the Analysis
 
 From the repository root:
@@ -36,6 +43,7 @@ From the repository root:
 ```powershell
 python scripts\run_boiling_hysteresis_analysis.py
 python scripts\run_boiling_hysteresis_submission_diagnostics.py
+python scripts\run_post_chf_protocol_diagnostics.py
 ```
 
 To use a different spreadsheet:
@@ -47,11 +55,30 @@ python scripts\run_boiling_hysteresis_analysis.py `
   --protocol-data "C:\path\to\MS Thesis Data.xlsx"
 ```
 
+When only the retained processed five-case summary is available, use it as a
+reproducible protocol input instead of a missing source workbook:
+
+```powershell
+python scripts\run_boiling_hysteresis_analysis.py `
+  --data "C:\path\to\MS Thesis Data_30cases.xlsx" `
+  --sheet "MS Thesis" `
+  --protocol-csv "manuscripts\boiling_hysteresis_subatmospheric\generated\protocol_validation_data.csv"
+```
+
 Generated files are written to:
 
 ```text
 manuscripts\boiling_hysteresis_subatmospheric\generated
 ```
+
+`run_post_chf_protocol_diagnostics.py` additionally requires the mounted
+five-case raw/processed dataset at `Z:\ned3-019-BoilingHysteresis10kPa`. It
+uses the selected manuscript event table for CHF, NBR, and the post-CHF heat
+flux minimum, then reconstructs heater cutoff from the processed DC-power
+trace. It writes a traceable metrics table and two candidate manuscript figures
+to `generated\protocol_diagnostics`. The derived post-CHF electrical energy is
+input energy between selected CHF and cutoff; it is not a stored-energy
+measurement.
 
 ## Analysis Summary
 
@@ -95,7 +122,7 @@ leave-one-surface-out score because their unseen-surface coefficient cannot be
 estimated from the training set.
 
 The five protocol cases are evaluated only after fitting the standard 30-case
-dataset. Their predictions and aggregate RMSE, MAE, and bias are written to
+dataset. Their fixed-parameter transfer predictions and aggregate RMSE, MAE, and bias are written to
 `protocol_validation_predictions.csv` and `submission_diagnostics.md`.
 
 ## Event-Selection Provenance
@@ -123,12 +150,12 @@ Parameters in the general stretched-exponential form are interpreted as:
   dry/vapor state.
 - `DeltaT_s` is the wall-superheat scale over which the post-CHF dry/vapor
   state matures.
-- `m` is a shape/cooperativity exponent for the thermal-maturity process.
+- `m` is a descriptive shape exponent for the fitted thermal-history relation.
 
 NBR temperature is analyzed as a complementary output through
-`T_NBR - T_sat`. A narrow NBR wall-superheat band supports the interpretation
-that return to nucleate boiling is a temperature-controlled rewetting event,
-not simply CHF in reverse.
+`T_NBR - T_sat`. A narrow apparent base-wall-superheat band is compatible with
+recovery over a limited wall-temperature range; it does not establish a unique
+rewetting mechanism or resolve liquid--solid contact.
 
 ## Generated Figures
 
@@ -148,6 +175,16 @@ not simply CHF in reverse.
 - `fig07_flat_mfb_regime_check`: flat-copper `T_max` compared with Berenson
   and Henry minimum-film-boiling temperature predictions; the structured
   surfaces are intentionally omitted from this flat-surface model check.
+- `protocol_diagnostics\fig_post_chf_controlled_trajectories`: selected CHF,
+  cutoff, maximum-temperature, and NBR trajectories for the five controlled
+  extended-heating tests.
+- `protocol_diagnostics\fig_post_chf_protocol_response_summary`: cutoff
+  fidelity, normalized recovery response, and protocol time scales for the
+  same five tests.
+- `protocol_diagnostics\fig_post_chf_hydrophone_context`: qualitative
+  hydrophone context for a short-wait and a long-wait test. It uses an
+  integrated PSD voltage-squared proxy and is not a calibrated acoustic or
+  wall-wetting measurement.
 
 ## Generated Tables
 
@@ -161,7 +198,7 @@ not simply CHF in reverse.
 - `protocol_validation_data.csv`: cleaned five-case protocol dataset excluded
   from fitting.
 - `protocol_validation_predictions.csv`: locked-model predictions for the
-  withheld protocol cases.
+  separate excluded protocol cases.
 - `flat_mfb_temperature_models.csv` and `flat_mfb_regime_points.csv`:
   flat-surface MFB curves and the standard/protocol points used in the regime
   check.
@@ -175,6 +212,9 @@ not simply CHF in reverse.
 - `hmin_profile_likelihood.csv`: profile analysis for the lower asymptote.
 - `hysteresis_*_bootstrap_curve.csv`: bootstrap curve intervals.
 - `submission_diagnostics.md`: concise numerical audit used for the manuscript.
+- `protocol_diagnostics\post_chf_protocol_metrics.csv`: selected event values
+  combined with reconstructed cutoff, overshoot, time partitions, and
+  post-CHF input-energy metrics for the five-case protocol series.
 
 ## Interpretation Caveat
 

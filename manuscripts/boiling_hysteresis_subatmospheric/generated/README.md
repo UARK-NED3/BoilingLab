@@ -9,8 +9,10 @@ The runner reads thermal summary quantities, NBR temperature, and optional
 BubbleID side-view vapor-fraction / bubble-count columns.
 
 An optional five-case flat-copper protocol spreadsheet can be supplied with
-`--protocol-data`. Those approximately 10 kPa cases are written separately and
-are not included in the 30-case parameter fits.
+`--protocol-data` or as a retained processed summary with `--protocol-csv`.
+Those approximately 10 kPa cases are written separately, are not included in
+the 30-case parameter fits, and provide a fixed-parameter protocol transfer
+evaluation rather than external validation.
 
 ## Core Models
 
@@ -35,7 +37,7 @@ H = H_min + (1 - H_min) exp[-((T_max - T_sat) / (T_ref - T_sat))^m].
 For submission diagnostics, run
 `scripts/run_boiling_hysteresis_submission_diagnostics.py`. That script fixes
 `H_min = 0` as a parsimonious boundary condition, compares candidate models by
-AICc and held-out validation, tests residual structure, profiles `H_min`, and
+AICc and cross-validation, tests residual structure, profiles `H_min`, and
 generates 2,000 pressure-block bootstrap intervals. It also evaluates the
 locked fits against the optional protocol cases. The preferred model uses
 `(T_max - T_sat)/(T_ref - T_sat)`; it should be treated as a semi-empirical
@@ -45,14 +47,24 @@ The diagnostic
 `theoretical_hmin_diagnostic.csv` compares it against a hydrodynamic
 `q''_MHF / q''_CHF` scale from Berenson/Zuber-type limiting heat fluxes.
 
+## Event provenance
+
+`event_ledger_standard_30_case.csv` and, when supplied,
+`event_ledger_extended_10kpa.csv` identify the selected CHF and NBR event
+times, heat fluxes, temperatures, and CHF-to-NBR intervals used by the
+manuscript. They do not constitute a re-detection workflow: the original
+case-specific search-window limits, exclusion intervals, and video-adjudication
+records were not retained in the organized summary. The ledger marks these
+fields explicitly as not retained rather than assigning a post hoc threshold.
+
 ## Main Figures
 
 - `fig01_chf_htc_vs_pressure`: heating-branch performance summary.
 - `fig02_hysteresis_vs_pressure`: pressure trend in boiling hysteresis.
 - `fig03_hysteresis_constant_scale_fit`: global collapse versus maximum wall
   superheat.
-- `fig04_nbr_wall_superheat_vs_pressure`: NBR wall-superheat band, supporting
-  temperature-controlled rewetting.
+- `fig04_nbr_wall_superheat_vs_pressure`: NBR apparent base-wall-superheat
+  trend across the standard cases.
 - `fig05_qnbr_rohsenow_parity`: sensitivity of q''_NBR(T_NBR) to the
   Rohsenow liquid-surface coefficient (`C_sf = 0.0128` and `0.0107`).
 - `fig06_bubbleid_vapor_fraction_by_stage`: two-panel BubbleID diagnostic

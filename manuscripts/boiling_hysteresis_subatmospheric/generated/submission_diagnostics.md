@@ -13,7 +13,7 @@
 - For the preferred T_ref model, the bootstrap median T_ref = 264.85 °C (95% interval 256.78-283.07 °C).
 - The preferred-model bootstrap median m = 1.650 (95% interval 1.466-1.854).
 
-## Held-out validation
+## Standard-series cross-validation
 | scheme | model | mean_RMSE | mean_MAE |
 | --- | --- | --- | --- |
 | leave_one_pressure_out | Tref_Hmin0 | 0.033394 | 0.030094 |
@@ -46,7 +46,7 @@
 
 Surface-specific models are excluded from leave-one-surface-out summaries because the held-out surface coefficient is not estimable from the training set.
 
-## Held-out 10 kPa protocol perturbation
+## Fixed-parameter 10 kPa protocol transfer evaluation
 | model | n | RMSE | MAE | bias_observed_minus_predicted |
 | --- | --- | --- | --- | --- |
 | stretched_Hmin0 | 5 | 0.15242 | 0.11661 | 0.099308 |

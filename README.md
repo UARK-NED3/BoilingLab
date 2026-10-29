@@ -70,6 +70,22 @@ The cache is a lossless, memory-mappable NumPy array with acquisition metadata. 
 
 The command writes CSV, Excel, time-series, and plot outputs. q_NBR/q_CHF is a screening proxy unless the upstream CHF marker is independently confirmed. MEB products apply to subcooled BoilingBench-1, not saturated BoilingBench-2, -3, or -4.
 
+## Subatmospheric boiling-hysteresis manuscript
+
+The manuscript-level workflow analyzes an organized 30-case spreadsheet rather than re-detecting events from raw records. It defines $H=q''_{\mathrm{NBR}}/q''_{\mathrm{CHF}}$, fits post-CHF thermal-history models, evaluates NBR wall superheat and a Rohsenow comparison, and summarizes available BubbleID side-view diagnostics. The selected CHF/NBR event ledger records the published event values and times; it does not recreate the original case-specific selection windows or video-adjudication notes.
+
+Run the 30-case workflow with an explicit released workbook path:
+
+    python scripts/run_boiling_hysteresis_analysis.py --data <30-case workbook> --sheet "MS Thesis"
+    python scripts/run_boiling_hysteresis_submission_diagnostics.py
+
+The five deliberately extended 10 kPa tests are separate from model fitting. To reconstruct their cutoff timing and reprocess hydrophone records, supply the separately archived raw-record root, the selected protocol-event table, and an output directory:
+
+    python scripts/run_post_chf_protocol_diagnostics.py --data-root <five-case archive> --event-ledger <protocol_validation_data.csv> --output-dir <output directory>
+    python scripts/run_post_chf_hydrophone_analysis.py --data-root <five-case archive> --event-ledger <protocol_validation_data.csv> --output-dir <output directory>
+
+See [manuscripts/boiling_hysteresis_subatmospheric/README.md](manuscripts/boiling_hysteresis_subatmospheric/README.md) for input schema, generated figures/tables, physical interpretation boundaries, and the two Zenodo dataset DOIs.
+
 ## Scientific cautions
 
 Read [data reduction](docs/data_reduction.md), [multimodal time alignment](docs/multimodal-time-alignment.md), and the relevant BoilingBench card. Check thermocouple order and locations, extrapolation distance, conductivity, pressure/saturation assumptions, calibration, units, sign conventions, regression R², quality fields, missing modalities, and alignment residuals.

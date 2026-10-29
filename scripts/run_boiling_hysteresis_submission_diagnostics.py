@@ -5,7 +5,7 @@ This script is intentionally separate from the figure-production script. It
 tests parameter identifiability, compares all candidate forms under common
 validation schemes, evaluates residual structure, performs pressure-block
 bootstrap resampling, and evaluates deliberately extended 10 kPa heating tests
-that were excluded from model fitting.
+that were excluded from model fitting and evaluated with fixed parameters.
 """
 from __future__ import annotations
 
@@ -609,7 +609,7 @@ def residual_diagnostics(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def protocol_validation_predictions(df: pd.DataFrame, protocol: pd.DataFrame) -> pd.DataFrame:
-    """Evaluate the held-out protocol perturbations without refitting."""
+    """Evaluate excluded protocol perturbations without refitting."""
     constant_params, _ = fit_model(df, "stretched_Hmin0")
     tref_params, _ = fit_model(df, "Tref_Hmin0")
     result = protocol.copy()
@@ -853,7 +853,7 @@ def write_report(
         f"- For the preferred T_ref model, the bootstrap median T_ref = {tref_bootstrap_params['T_ref_C'].median():.2f} °C (95% interval {tref_bootstrap_params['T_ref_C'].quantile(0.025):.2f}-{tref_bootstrap_params['T_ref_C'].quantile(0.975):.2f} °C).",
         f"- The preferred-model bootstrap median m = {tref_bootstrap_params['m'].median():.3f} (95% interval {tref_bootstrap_params['m'].quantile(0.025):.3f}-{tref_bootstrap_params['m'].quantile(0.975):.3f}).",
         "",
-        "## Held-out validation",
+        "## Standard-series cross-validation",
         markdown_table(cv_summary),
         "",
         "Surface-specific models are excluded from leave-one-surface-out summaries because the held-out surface coefficient is not estimable from the training set.",
@@ -866,7 +866,7 @@ def write_report(
     ]
     if protocol_metrics is not None:
         lines[lines.index("## Residual diagnostics"):lines.index("## Residual diagnostics")] = [
-            "## Held-out 10 kPa protocol perturbation",
+            "## Fixed-parameter 10 kPa protocol transfer evaluation",
             markdown_table(protocol_metrics),
             "",
         ]
@@ -885,7 +885,7 @@ def parse_args() -> argparse.Namespace:
         "--protocol-data",
         type=Path,
         default=None,
-        help="Optional held-out protocol-validation CSV from the main analysis runner.",
+        help="Optional excluded-protocol CSV from the main analysis runner.",
     )
     parser.add_argument(
         "--output",
