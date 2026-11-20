@@ -44,6 +44,7 @@ From the repository root:
 python scripts\run_boiling_hysteresis_analysis.py
 python scripts\run_boiling_hysteresis_submission_diagnostics.py
 python scripts\run_post_chf_protocol_diagnostics.py
+python scripts\run_post_chf_hydrophone_analysis.py
 ```
 
 To use a different spreadsheet:
@@ -79,6 +80,17 @@ trace. It writes a traceable metrics table and two candidate manuscript figures
 to `generated\protocol_diagnostics`. The derived post-CHF electrical energy is
 input energy between selected CHF and cutoff; it is not a stored-energy
 measurement.
+
+The run_post_chf_hydrophone_analysis.py runner additionally reprocesses the raw
+Hydrophones.lvm records from the five extended 10 kPa cases. It uses the
+archived hydrophone-to-temperature clock offsets and the manuscript-selected
+thermal events, rather than the release screening-event files. The runner
+calculates a time-local voltage PSD in 2 s Hann windows with 75% overlap,
+integrates the 40--3000 Hz band, and writes event-window summaries to
+generated/protocol_diagnostics/hydrophone_event_analysis. The resulting
+quantity is an uncalibrated band-integrated voltage-variance proxy. It is not
+acoustic pressure, sound power, bubble-collapse energy, a direct vapor-film
+measurement, or a wall-wetting measurement.
 
 ## Analysis Summary
 
@@ -186,6 +198,14 @@ rewetting mechanism or resolve liquid--solid contact.
   integrated PSD voltage-squared proxy and is not a calibrated acoustic or
   wall-wetting measurement.
 
+- protocol_diagnostics/hydrophone_event_analysis/fig_post_chf_hydrophone_event_context:
+  event-aligned raw-record reprocessing for the 100 and 250 C-target cases. It
+  reports both the thermal trajectory and 40--3000 Hz hydrophone
+  voltage-variance level.
+- protocol_diagnostics/hydrophone_event_analysis/fig_post_chf_hydrophone_window_summary:
+  within-case event-window levels for all five extended tests. It is a
+  descriptive diagnostic, not an acoustic correlation for H.
+
 ## Generated Tables
 
 - `processed_hysteresis_data.csv`: cleaned analysis table with derived
@@ -215,6 +235,13 @@ rewetting mechanism or resolve liquid--solid contact.
 - `protocol_diagnostics\post_chf_protocol_metrics.csv`: selected event values
   combined with reconstructed cutoff, overshoot, time partitions, and
   post-CHF input-energy metrics for the five-case protocol series.
+
+- protocol_diagnostics/hydrophone_event_analysis/hydrophone_psd_features.csv:
+  time-local band-integrated voltage-PSD features from the raw hydrophone
+  records.
+- protocol_diagnostics/hydrophone_event_analysis/hydrophone_event_window_summary.csv:
+  descriptive event-window medians, dispersion, and low-level fractions
+  referenced to each case's pre-CHF level.
 
 ## Interpretation Caveat
 
